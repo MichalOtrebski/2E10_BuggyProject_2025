@@ -237,6 +237,30 @@ void loop() {
 
 }
 
+//* Initialises All Pins to the Correct State
+void PinInitialise() {
+  // IR SENSORS
+  pinMode(IR_LEFT, INPUT);
+  pinMode(IR_RIGHT, INPUT);
+
+  // LEFT MOTOR + HALL
+  pinMode(LEFT1, OUTPUT);
+  pinMode(LEFT2, OUTPUT);
+  pinMode(LEFT_HALL, INPUT);
+
+  // RIGHT MOTOR + HALL
+  pinMode(RIGHT1, OUTPUT);
+  pinMode(RIGHT2, OUTPUT);
+  pinMode(RIGHT_HALL, INPUT);
+
+  // PWM CONTROL PINS
+  pinMode(L_MOT, OUTPUT);
+  pinMode(R_MOT, OUTPUT);
+
+  attachInterrupt(digitalPinToInterrupt(LEFT_HALL), LeftHallISR, RISING);
+  attachInterrupt(digitalPinToInterrupt(RIGHT_HALL), RightHallISR, RISING);
+}
+
 //* CHECK IF DISTANCE IS WITHIN LIMITS
 void obstacle() {
 
@@ -346,99 +370,6 @@ void CheckAndSend() {
   }
 }
 
-//* Initialises All Pins to the Correct State
-void PinInitialise() {
-  // IR SENSORS
-  pinMode(IR_LEFT, INPUT);
-  pinMode(IR_RIGHT, INPUT);
-
-  // LEFT MOTOR + HALL
-  pinMode(LEFT1, OUTPUT);
-  pinMode(LEFT2, OUTPUT);
-  pinMode(LEFT_HALL, INPUT);
-
-  // RIGHT MOTOR + HALL
-  pinMode(RIGHT1, OUTPUT);
-  pinMode(RIGHT2, OUTPUT);
-  pinMode(RIGHT_HALL, INPUT);
-
-  // PWM CONTROL PINS
-  pinMode(L_MOT, OUTPUT);
-  pinMode(R_MOT, OUTPUT);
-
-  attachInterrupt(digitalPinToInterrupt(LEFT_HALL), LeftHallISR, RISING);
-  attachInterrupt(digitalPinToInterrupt(RIGHT_HALL), RightHallISR, RISING);
-}
-
-//* Prints Some Debug Info over Serial
-void printDebug() {
-
-  Serial.println("------------------");
-
-  // Serial.print("ENABLE: ");
-  // Serial.println(Data.enable);
-
-  Serial.print("LEFT IR: ");
-  Serial.println(L_IR_O);
-  Serial.print("RIGHT IR: ");
-  Serial.println(R_IR_O);
-
-  Serial.print("SPEED: ");
-  Serial.println(String(Data.speed));
-
-  Serial.print("DISTANCE: ");
-  Serial.println(Data.distance);
-
-  Serial.print("MODE: ");
-  Serial.println(String(Data.mode));
-
-  // Serial.print("OBS: ");
-  // Serial.println(String(Data.obstacle));
-  
-  // Serial.print("input: ");
-  // Serial.println(String(turningInput)); 
-
-  // Serial.print("output: ");
-  // Serial.println(turningOutput);
-
-  // Serial.print("Kp: ");
-  // Serial.println(String(Data.Kp));
-  // Serial.print("Ki: ");
-  // Serial.println(String(Data.Ki));
-  // Serial.print("Kd: ");
-  // Serial.println(String(Data.Kd));
-
-  Serial.println("------------------");
-}
-
-//* INTERUPT SERVICE ROUTINE
-void LeftHallISR() {
-  unsigned long current = micros();
-  float dt = (current - leftHall.last) / 1.0e6;
-  leftHall.last = current;
-
-  leftHall.pulse++;
-  leftHall.distance = leftHall.pulse * (CIRCUM/PPR) / 100.0;
-
-  if (dt > 0) {
-    leftHall.speed = (CIRCUM/PPR) / dt;
-  }
-} 
-
-//* INTERUPT SERVICE ROUTINE
-void RightHallISR() {
-  unsigned long current = micros();
-  float dt = (current - rightHall.last) / 1.0e6;
-  rightHall.last = current;
-
-  rightHall.pulse++;
-  rightHall.distance = rightHall.pulse * (CIRCUM/PPR) / 100.0;
-
-  if (dt > 0) {
-    rightHall.speed = (CIRCUM/PPR) / dt;
-  }
-}
-
 void sortData(String data) {
   if (data.indexOf("enable") != std::string::npos) {
     Data.enable = !Data.enable;
@@ -488,6 +419,34 @@ void ServerExchange() {
   }
 }
 
+//* INTERUPT SERVICE ROUTINE
+void LeftHallISR() {
+  unsigned long current = micros();
+  float dt = (current - leftHall.last) / 1.0e6;
+  leftHall.last = current;
+
+  leftHall.pulse++;
+  leftHall.distance = leftHall.pulse * (CIRCUM/PPR) / 100.0;
+
+  if (dt > 0) {
+    leftHall.speed = (CIRCUM/PPR) / dt;
+  }
+} 
+
+//* INTERUPT SERVICE ROUTINE
+void RightHallISR() {
+  unsigned long current = micros();
+  float dt = (current - rightHall.last) / 1.0e6;
+  rightHall.last = current;
+
+  rightHall.pulse++;
+  rightHall.distance = rightHall.pulse * (CIRCUM/PPR) / 100.0;
+
+  if (dt > 0) {
+    rightHall.speed = (CIRCUM/PPR) / dt;
+  }
+}
+
 void checkTimeout() {
     unsigned long current = micros();
 
@@ -499,3 +458,45 @@ void checkTimeout() {
         rightHall.speed = 0.0;
     }
 }
+
+//* Prints Some Debug Info over Serial
+void printDebug() {
+
+  Serial.println("------------------");
+
+  // Serial.print("ENABLE: ");
+  // Serial.println(Data.enable);
+
+  Serial.print("LEFT IR: ");
+  Serial.println(L_IR_O);
+  Serial.print("RIGHT IR: ");
+  Serial.println(R_IR_O);
+
+  Serial.print("SPEED: ");
+  Serial.println(String(Data.speed));
+
+  Serial.print("DISTANCE: ");
+  Serial.println(Data.distance);
+
+  Serial.print("MODE: ");
+  Serial.println(String(Data.mode));
+
+  // Serial.print("OBS: ");
+  // Serial.println(String(Data.obstacle));
+  
+  // Serial.print("input: ");
+  // Serial.println(String(turningInput)); 
+
+  // Serial.print("output: ");
+  // Serial.println(turningOutput);
+
+  // Serial.print("Kp: ");
+  // Serial.println(String(Data.Kp));
+  // Serial.print("Ki: ");
+  // Serial.println(String(Data.Ki));
+  // Serial.print("Kd: ");
+  // Serial.println(String(Data.Kd));
+
+  Serial.println("------------------");
+}
+
