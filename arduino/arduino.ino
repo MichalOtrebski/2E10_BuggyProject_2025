@@ -1,14 +1,8 @@
-/* #region LIBRARIES */
-
 #include <WiFiS3.h>
 #include <NewPing.h>      //* Library for the HC-SR04 US Rangefinder, it does the rangefinding
 #include <PID_v1.h>       //* PID Library for Computing PID Output
 #include <string>
 #include <math.h>
-
-/* #endregion */
-
-/* #region WIFI */
 
 char ssid[] = "Y13ARDUINO";
 char pass[] = "123456789";
@@ -16,10 +10,6 @@ char pass[] = "123456789";
 WiFiServer server(5200);
 
 WiFiClient client;
-
-/* #endregion */
-
-/* #region PINS */
 
 //* IR sensor Pins
 const int IR_LEFT = 18; // 18
@@ -43,10 +33,6 @@ const int RIGHT_HALL = 3; // 3
 const int L_MOT = 5;  // PWM pins 5
 const int R_MOT = 6;  // PWM pins 6
 
-/* #endregion */
-
-/* #region STRUCTS */
-
 //* Local Data Storage
 struct LocalData{
   bool enable = false;
@@ -56,9 +42,6 @@ struct LocalData{
   volatile double travelled = 0;
   int speed = 0;
   int BuggySpeed = 0;
-  double Kp = 2.5;
-  double Ki = 0.02;
-  double Kd = 12;
 };
 
 struct EncoderData {
@@ -67,10 +50,6 @@ struct EncoderData {
   volatile float speed;
   volatile unsigned long last;
 };
-
-/* #endregion */
-
-/* #region VARIABLES */
 
 LocalData Data; //* Current Data
 LocalData PrevData; //* Previous Data to Compare
@@ -111,16 +90,16 @@ double turningInput;
 double turningSetpoint = 0;
 double turningOutput;
 
-double turningKp = 40;
+double turningKp = 45;
 double turningKi = 0.025; 
-double turningKd = 2.5; 
+double turningKd = 2.5;
 
 // STRAIGHT PID VARIABLES
 double straightInput = 0; 
 double straightSetpoint = 0; 
 double straightOutput;
 
-double straightKp = 40;
+double straightKp = 45;
 double straightKi = 0.025; 
 double straightKd = 2.5; 
 
@@ -135,8 +114,6 @@ int scaledTurnSpeed;
 int TurningSpeed;
 
 bool set = false;
-
-/* #endregion */
 
 void setup() {
   Serial.begin(115200);
@@ -254,7 +231,7 @@ void loop() {
 
   //printDebug();
   ending = micros();
-  Serial.println("loop:" + String(ending - starting));
+  //Serial.println("loop:" + String(ending - starting));
 
   //Serial.println(Data.BuggySpeed);
 
@@ -378,12 +355,12 @@ void PinInitialise() {
   // LEFT MOTOR + HALL
   pinMode(LEFT1, OUTPUT);
   pinMode(LEFT2, OUTPUT);
-  pinMode(LEFT_HALL, INPUT_PULLUP);
+  pinMode(LEFT_HALL, INPUT);
 
   // RIGHT MOTOR + HALL
   pinMode(RIGHT1, OUTPUT);
   pinMode(RIGHT2, OUTPUT);
-  pinMode(RIGHT_HALL, INPUT_PULLUP);
+  pinMode(RIGHT_HALL, INPUT);
 
   // PWM CONTROL PINS
   pinMode(L_MOT, OUTPUT);
