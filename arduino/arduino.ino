@@ -64,13 +64,13 @@ EncoderData rightHall = {0, 0.0, 0.0, 0};
 //Pulses Per Revolution
 const double PPR = 4.0;
 const float CIRCUM = 6.5 * M_PI; // in cm
-const int timeout = 400000;
+const int timeout = 500000;
 
 // IR SENSOR OUTPUT
 bool L_IR_O; 
 bool R_IR_O;
 
-bool black = true; //! true == on black surface || false == on light surface
+bool black = false; //! true == on black surface || false == on light surface
 
 // Vars for Computing Loop Execution Time
 unsigned long starting;
@@ -94,7 +94,7 @@ double turningInput;
 double turningSetpoint = 0;
 double turningOutput;
 
-double turningKp = 45;
+double turningKp = 35;
 double turningKi = 0.025; 
 double turningKd = 2.5;
 
@@ -126,9 +126,10 @@ void loop() {
   starting = micros(); // Loop start time
   now = millis(); // used for checking the time of the loop
 
+  checkTimeout();
 
   // check for numerator 0, dividing 0 by anything is technically compiler specific, but just in case =
-  if (leftHall.speed != 0.0 && rightHall.speed != 0.0) {
+  if (!(leftHall.speed == 0.0 && rightHall.speed == 0.0)) {
     Data.BuggySpeed = (leftHall.speed + rightHall.speed) / 2.0; // average speed between the two wheels
   } else {
     Data.BuggySpeed = 0.0;
@@ -144,8 +145,6 @@ void loop() {
     prev_send = now;
   }
 
-  checkTimeout();
-
   // ON/OFF
   if (Data.enable) {
 
@@ -159,7 +158,6 @@ void loop() {
     scaledTurnSpeed = baseTurningSpeed + Data.speed*(0.3); // scales the turning speed based on the user set speed
     TurningSpeed = constrain(turningOutput, 0, 255);  // constrains the PID output to an 8 Bit value
 
-    //! NOT FINAL
     // DEFAULT MODE
     if (Data.mode == 0) {
 
@@ -181,7 +179,7 @@ void loop() {
     else if (Data.mode == 1) {
       //TODO: additional mode
     } 
-  } 
+  }
 
   // WHEN BUGGY IS OFF
   else {
