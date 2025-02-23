@@ -203,12 +203,12 @@ void PinInitialise() {
   // LEFT MOTOR + HALL
   pinMode(LEFT1, OUTPUT);
   pinMode(LEFT2, OUTPUT);
-  pinMode(LEFT_HALL, INPUT);
+  pinMode(LEFT_HALL, INPUT_PULLUP); // INPUT_PULLUP uses na internal pullup resistor to restor the state of the pin to HIGH, since the hall effect sensors use an open collector
 
   // RIGHT MOTOR + HALL
   pinMode(RIGHT1, OUTPUT);
   pinMode(RIGHT2, OUTPUT);
-  pinMode(RIGHT_HALL, INPUT);
+  pinMode(RIGHT_HALL, INPUT_PULLUP); // INPUT_PULLUP uses na internal pullup resistor to restor the state of the pin to HIGH, since the hall effect sensors use an open collector
 
   // PWM CONTROL PINS
   pinMode(L_MOT, OUTPUT);
@@ -451,13 +451,6 @@ void printDebug() {
 
   Serial.print("output: ");
   Serial.println(turningOutput);
-
-  Serial.print("Kp: ");
-  Serial.println(String(Data.Kp));
-  Serial.print("Ki: ");
-  Serial.println(String(Data.Ki));
-  Serial.print("Kd: ");
-  Serial.println(String(Data.Kd));
 
   Serial.println("loop:" + String(ending - starting));
 
