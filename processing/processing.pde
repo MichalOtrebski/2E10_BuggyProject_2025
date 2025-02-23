@@ -1,15 +1,19 @@
-import meter.*;
-import g4p_controls.*;
-import controlP5.*;
-import java.awt.Font;
-import processing.net.*;
+// LIBRARIES
+import meter.*;                // meter Library for graphing analog values
+import g4p_controls.*;         // G4P Library for TextField Objects
+import controlP5.*;            // ControlP5 Library for control systems
+import java.awt.Font;          // font library
+import processing.net.*;       // Networking library for processing
 
-Client arduino;
-String data;
-boolean connected = false;
 
-ControlP5 cp5;
+Client arduino;                // INITIALISES A CLIENT OBJECT
+String data;                   // STORES RECEIVED DATA
+boolean connected = false;     // CHECKS IF WE ARE CONNECTED
 
+ControlP5 cp5;                 // CONTROLP5 OBJECT FOR CREATING BUTTONS AND SLIDERS
+
+
+// INITIALISES BUTTONS, SLIDERS, METERS, AND TEXTFIELDS
 Button Start;
 Button Mode;
 Button SetDistance;
@@ -23,47 +27,51 @@ GLabel TravLabel;
 
 Meter speedometer;
 
-int flashInterval = 500;
-int lastFlashTime = 0;
+// VARIABLES
+int flashInterval = 500;  // interval for flashing the screen red when theres an obstacle
+int lastFlashTime = 0;    // last flash time for checking the interval
 
-boolean isOn = false;
-int mode = 0;
+int mode = 0;             // mode that we are in
 String distance = "0";
 String travelled = "0";
-int sliderSpeed;
-double speed = 0;
+int sliderSpeed;          // speed set by the slider
+double speed = 0;         // actual buggy speed
 boolean obstacle = false;
-boolean showRed = false;
+boolean showRed = false;  // tells the program when to display red when theres an obstacle, ex. show red for 500ms so itll be true, then turn false and return to normal
 
-int btnwidth, btnheight;
-boolean StartisPressed = false;
-boolean SetisPressed = false;
+int btnwidth, btnheight;  // standard button height and width
+boolean StartisPressed = false;  // i make the button a toggle switch, so itll be green normally and if we press it itll be red and change the text
 
-int distColor = color(220, 150, 50);
-int borderwidth = 5;
+int distColor = color(220, 150, 50);  // color fot the border of distance from US sensor
+int borderwidth = 5;                  // width of said border above
 
 void setup() {
-  size(1400, 800);
+  size(1400, 800);  // window size
   
-  arduino = new Client(this,"192.168.1.1", 5200);
+  arduino = new Client(this,"192.168.1.1", 5200);  //connect to the arduino Access Point
   
+  // CREATES A NEW THREAD FOR RUNNING THE listen() FUNCTION WHICH LISTENS TO INCOMING DATA FROM THE ARDUINO
   new Thread(new Runnable() {
     public void run() {
      listen(); 
     }
   }).start();
   
+  // if the arduino is active.
   if (arduino.active()) {
     connected = true;
   }
   
   cp5 = new ControlP5(this);
   
+  // button width and height based on window size
   btnwidth = width/7;
   btnheight = height/10;
   
+  // just a font sused for the textfield
   Font customFont = new Font("Arial", Font.PLAIN ,24);
   
+  // START/STOP BUTTON
   Start = cp5.addButton("enable")
       .setPosition(width*(0.025), width*(0.025))
       .setSize(btnwidth, btnheight)
@@ -74,7 +82,7 @@ void setup() {
 
   Start.getCaptionLabel().setSize(20);
   
- 
+  // CHANGE MODE BUTTON
   Mode = cp5.addButton("changeMode")
       .setPosition(width*(0.025), 2 * width*(0.025) + btnheight)
       .setSize(btnwidth, btnheight)
@@ -85,7 +93,7 @@ void setup() {
      
   Mode.getCaptionLabel().setSize(20);
   
-  
+  // DISTANCE TEXTFIELD
   DistanceDisplay = new GTextField(this, width*(0.025)+ btnwidth/4, 3*width*(0.025) + 2*btnheight, btnwidth/2, btnheight/2);
   DistanceDisplay.setFont(customFont);
   DistanceDisplay.setText(distance + " cm");
@@ -101,7 +109,7 @@ void setup() {
   DistanceLabel.setTextBold();
   DistanceLabel.setLocalColor(G4P.TEXT, color(255));
   
-  
+  // TRAVELLED DISTANCE TEXTFIELD
   DistanceTrav = new GTextField(this, width*(0.025)+ btnwidth/4, 4*width*(0.025) + 3*btnheight, btnwidth/2, btnheight/2);
   DistanceTrav.setFont(customFont);
   DistanceTrav.setText(travelled + " m");
@@ -118,6 +126,7 @@ void setup() {
   TravLabel.setTextBold();
   TravLabel.setLocalColor(G4P.TEXT ,color(255));
 
+  // SPEED CONTROL SLIDER
   speedSlider = cp5.addSlider("speed")
      .setPosition(2*width*(0.025)+1.25*btnwidth, width*(0.025)) // X, Y position
      .setSize(40, Math.round(width*(0.025)+2*btnheight)) // Width, Height
@@ -127,10 +136,10 @@ void setup() {
      .setColorBackground(color(100)) // Background color
      .setColorActive(color(0, 160, 160)); // Color when sliding
      
+  // SPEEDOMETER METER
   speedometer = new Meter(this, Math.round(3*width*(0.025)+1.5*btnwidth) + 40, Math.round(width*(0.025)), false);
   
   String[] scaleLabels = {"0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100"};
-  
   
   speedometer.setMeterWidth(350);
   speedometer.setMinScaleValue(0.0);
@@ -144,40 +153,49 @@ void setup() {
 }
 
 void draw() {
-  background(50);
+  background(50);  // window background color
   
-  //println(sliderSpeed);
+  // UPDATE THE DISTANCE AND DISTANCE TRAVELLED
   DistanceDisplay.setText(distance + " cm");
   DistanceTrav.setText(travelled + " m");
   
+  // if theres an obstacle flash the screen red every X ms
   if (obstacle) {
+    
+      // check if we should show red or default based on the interval
       if (millis() - lastFlashTime > flashInterval) {
         showRed = !showRed;
         lastFlashTime = millis();
       }
   
+      // if we should show red show it, otherwise show default
       if (showRed) {
         background(255, 0, 0); // Red flash
       } else {
         background(50); // Normal background
       }
-  
-      fill(255);
-      textAlign(CENTER, CENTER);
-      textSize(50);
+      
+      // alert settings
+      fill(255); // color of text, 255 = white
+      textAlign(CENTER, CENTER);  // justification, centered in the window
+      textSize(50);  // font size
       text("OBSTACLE ALERT!", width / 2, height / 2);
     } else {
       background(50);
   }
   
-    
-  speedometer.updateMeter((int)speed);   
+  // update the speedometer with new speed
+  speedometer.updateMeter((int)speed);
 
+  // draw the box around Distance and Distance travelled
   drawBorderedBox(width*(0.025)+ btnwidth/4 - borderwidth, 3*width*(0.025) + 2*btnheight - borderwidth, btnwidth/2 + borderwidth*2, btnheight/2 + borderwidth*2, distColor);
   drawBorderedBox(width*(0.025)+ btnwidth/4 - borderwidth, 4*width*(0.025) + 3*btnheight - borderwidth, btnwidth/2 + borderwidth*2, btnheight/2 + borderwidth*2, color(50, 150, 200));
 }
 
+// Event Handler
 void controlEvent(ControlEvent event) {
+  
+  // if the event is from the start/sstop button, toggle between on and off
   if (event.isController() && event.getController().getName().equals("enable")) {
     StartisPressed = !StartisPressed; // Toggle state
     if (StartisPressed) {
@@ -192,8 +210,10 @@ void controlEvent(ControlEvent event) {
     }
     
     SendData("enable");
-    
-  } else if (event.isController() && event.getController().getName().equals("changeMode")) {
+  } 
+  
+  // if the event is from the change mode button, change the mode and update
+  else if (event.isController() && event.getController().getName().equals("changeMode")) {
 
     mode++;
     if (mode > 1) {
@@ -209,29 +229,11 @@ void controlEvent(ControlEvent event) {
       break;
     }
     
-    if (mode == 1) {
-      showButton();
-    } else{
-      hideButton();
-    }
-    
     SendData("changeMode");
-    
-  } else if (event.isController() && event.getController().getName().equals("SetDistance")) {
-    SetisPressed = !SetisPressed;
-    if (SetisPressed) {
-      SetDistance.setColorBackground(color(230, 100, 100));
-      SetDistance.setColorForeground(color(180, 70, 70));
-      distColor = color(230, 100, 100);
-    } else {
-      SetDistance.setColorBackground(color(220, 160, 40));
-      SetDistance.setColorForeground(color(180, 120, 0));
-      distColor = color(220, 150, 50);
-    }
-    
-    SendData("set");
-    
-  } else if (event.isController() && event.getController().getName().equals("speed")) {
+  } 
+  
+  // if the event is from the speed slider, convert from percentage to 8 bit and send the data
+  else if (event.isController() && event.getController().getName().equals("speed")) {
     sliderSpeed = (int) event.getController().getValue();
     float bit_8 = sliderSpeed/100.0*255.0;
     SendData("speed:" + str(bit_8));
@@ -239,28 +241,7 @@ void controlEvent(ControlEvent event) {
   }
 }
 
-void showButton() {
-  if (SetDistance == null) { // Only add if it doesn't exist
-    SetDistance = cp5.addButton("SetDistance")
-                     .setPosition(2*width*(0.01875) + btnwidth, 2*width*(0.025) + btnheight*1.25)
-                     .setSize(btnwidth/4, btnheight/2)
-                     .setColorBackground(color(220, 160, 40))
-                     .setColorForeground(color(180, 120, 0))
-                     .setColorActive(color(100, 100, 100))
-                     .setLabel("Set");
-  }
-}
-
-void hideButton() {
-  if (SetDistance != null) {
-    cp5.remove("SetDistance"); // Remove button
-    SetDistance = null; // Set to null so we can re-add it later
-    distColor = color(220, 150, 50);
-    SetisPressed = false;
-    SendData("set");
-  }
-}
-
+// draws a box give coords and wcolor.
 void drawBorderedBox(float x, float y, float w, float h, int fillColor) {
   stroke(fillColor); // Border color
   strokeWeight(3);
@@ -268,11 +249,11 @@ void drawBorderedBox(float x, float y, float w, float h, int fillColor) {
   rect(x, y, w, h, 3.0); // Rounded rectangle
 }
 
+// receive the data from arduino, parse through it, and update values based on the data
 void listen() {
   while(connected) {
     if (arduino.available() > 0) {
-      //println("connected");
-        
+
       data = arduino.readStringUntil('\n');
       data.trim();
       int sep = data.indexOf(":");
@@ -298,6 +279,7 @@ void listen() {
   }
 }
 
+// send data to arduino
 void SendData(String message) {
   if (connected && arduino.active()) {
     arduino.write(message + '\n');
