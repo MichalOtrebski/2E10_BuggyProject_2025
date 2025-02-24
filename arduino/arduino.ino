@@ -70,7 +70,7 @@ const int timeout = 500000;
 bool L_IR_O; 
 bool R_IR_O;
 
-bool black = false; //! true == on black surface || false == on light surface
+bool black = true; //! true == on black surface || false == on light surface
 
 // Vars for Computing Loop Execution Time
 unsigned long starting;
@@ -312,7 +312,6 @@ void CheckAndSend() {
   if (Data.distance != PrevData.distance) {
     client.print("distance:" + String(Data.distance) + '\n');
     changed = true;
-
   }
 
   if (Data.BuggySpeed != PrevData.BuggySpeed) {
@@ -406,7 +405,7 @@ void RightHallISR() {
   }
 }
 
-// checks the timeout of the wheel encoders, if the wheels dont spin we dont wan to keep the last recorded speed, we instead want it to be zero, so we timeout the wheels after X seconds and set the speed to 0;
+// checks the timeout of the wheel encoders, if the wheels dont spin we dont want to keep the last recorded speed, we instead want it to be zero, so we timeout the wheels after X seconds and set the speed to 0;
 void checkTimeout() {
     unsigned long current = micros();
 

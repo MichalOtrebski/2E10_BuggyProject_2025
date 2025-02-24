@@ -12,7 +12,6 @@ boolean connected = false;     // CHECKS IF WE ARE CONNECTED
 
 ControlP5 cp5;                 // CONTROLP5 OBJECT FOR CREATING BUTTONS AND SLIDERS
 
-
 // INITIALISES BUTTONS, SLIDERS, METERS, AND TEXTFIELDS
 Button Start;
 Button Mode;
