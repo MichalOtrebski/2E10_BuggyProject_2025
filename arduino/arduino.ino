@@ -41,7 +41,7 @@ struct LocalData{
   int mode = 0;
   bool obstacle = false;
   long distance = 0;
-  volatile double travelled = 0;
+  double travelled = 0;
   int speed = 0;
   int BuggySpeed = 0;
 };
