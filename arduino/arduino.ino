@@ -70,7 +70,7 @@ const int timeout = 500000;
 bool L_IR_O; 
 bool R_IR_O;
 
-bool black = true; //! true == on black surface || false == on light surface
+bool black = false; //! true == on black surface || false == on light surface
 
 // Vars for Computing Loop Execution Time
 unsigned long starting;
@@ -95,21 +95,21 @@ double turningSetpoint = 0;
 double turningOutput;
 
 double turningKp = 35;
-double turningKi = 0.025; 
-double turningKd = 2.5;
+double turningKi = 1; 
+double turningKd = 10;
 
 // STRAIGHT PID VARIABLES
-auto straightInput = 15;
+double straightInput = 15;
 double straightSetpoint = 15; 
 double straightOutput;
 
-double straightKp = 45;
-double straightKi = 0.025; 
-double straightKd = 2.5; 
+double straightKp = 10;
+double straightKi = 1; 
+double straightKd = 0; 
 
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
-PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
-PID straightPID(&straightInput, &straightOutput, &straightSetpoint, straightKp, straightKi, straightKd, DIRECT);
+PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, REVERSE);
+PID straightPID(&straightInput, &straightOutput, &straightSetpoint, straightKp, straightKi, straightKd, REVERSE);
 
 // left and right wheel speed
 double LeftSpeed;
@@ -165,7 +165,7 @@ void loop() {
     obstacle(); // Reads distance and checks for obstacles
 
     // from testing the pid worked when the input was -1 so i made the input -1 no matter which sensor is active
-    turningInput = -abs(L_IR_O - R_IR_O);
+    turningInput = abs(L_IR_O - R_IR_O);
     turningPID.Compute(); // computes the PID
 
     scaledTurnSpeed = baseTurningSpeed + Data.speed*(0.3); // scales the turning speed based on the user set speed
@@ -191,29 +191,22 @@ void loop() {
     // REFERENCE OBJECT MODE
     else if (Data.mode == 1) {
 
-      if (set) {
-        
-        straightInput = Data.distance;
-        straightPID.Compute();
-        straightPID.SetOutputLimits(0, 255);
+      straightInput = Data.distance;
+      straightPID.Compute();
+      straightPID.SetOutputLimits(70, 255); 
 
-        if (Data.obstacle) {
-          stop();
-        } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-          forward(straightOutput);
-        } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
-          left();
-        } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
-          right();
-        } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
-          stop();
-        }  
-      } 
-      
-      else {
+      if (Data.obstacle){
+        stop();
+      } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
+        forward(130);
+      } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
+        left();
+      } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
+        right();
+      } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
         stop();
       }
-    } 
+    }
   }
 
   // WHEN BUGGY IS OFF
@@ -224,7 +217,10 @@ void loop() {
   }
 
   ending = micros();
+  //Serial.println("speed: " + String(straightOutput));
   //printDebug();
+
+  Serial.println(String(ending - starting));
 }
 
 //* Initialises All Pins to the Correct State
@@ -264,7 +260,7 @@ void obstacle() {
   }
 
   // CHECKS DISTANCE, ADDS A 2CM BUFFER ZONE, BETWEEN 15-17cm
-  if (Data.distance > 17 || Data.distance <= 0) {
+  if (Data.distance >= 15 || Data.distance <= 0) {
     Data.obstacle = false;
   } else if (Data.distance < 15) {
     Data.obstacle = true;
@@ -385,15 +381,6 @@ void sortData(String data) {
       Data.mode = 0;
     }
     Serial.println(Data.mode);
-  } 
-  
-  else if (data.indexOf("set") != std::string::npos) {
-    if (!set) {
-    straightSetpoint = Data.distance;
-    set = true;
-    } else {
-      set = false;
-    }
   }
 }
 

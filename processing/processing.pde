@@ -170,7 +170,6 @@ void draw() {
       background(50);
   }
   
-    
   speedometer.updateMeter((int)speed);   
 
   drawBorderedBox(width*(0.025)+ btnwidth/4 - borderwidth, 3*width*(0.025) + 2*btnheight - borderwidth, btnwidth/2 + borderwidth*2, btnheight/2 + borderwidth*2, distColor);
@@ -181,7 +180,7 @@ void controlEvent(ControlEvent event) {
   if (event.isController() && event.getController().getName().equals("enable")) {
     StartisPressed = !StartisPressed; // Toggle state
     if (StartisPressed) {
-      Start.setColorBackground(color(230, 100, 100)); // New color
+      Start.setColorBackground(color(230, 100, 100)); // New color 
       Start.setColorForeground(color(180, 70, 70));
       Start.setLabel("Turn OFF");
     } else {
@@ -210,9 +209,9 @@ void controlEvent(ControlEvent event) {
     }
     
     if (mode == 1) {
-      showButton();
+      //showButton();
     } else{
-      hideButton();
+      //hideButton();
     }
     
     SendData("changeMode");
@@ -239,27 +238,27 @@ void controlEvent(ControlEvent event) {
   }
 }
 
-void showButton() {
-  if (SetDistance == null) { // Only add if it doesn't exist
-    SetDistance = cp5.addButton("SetDistance")
-                     .setPosition(2*width*(0.01875) + btnwidth, 2*width*(0.025) + btnheight*1.25)
-                     .setSize(btnwidth/4, btnheight/2)
-                     .setColorBackground(color(220, 160, 40))
-                     .setColorForeground(color(180, 120, 0))
-                     .setColorActive(color(100, 100, 100))
-                     .setLabel("Set");
-  }
-}
+//void showButton() {
+//  if (SetDistance == null) { // Only add if it doesn't exist
+//    SetDistance = cp5.addButton("SetDistance")
+//                     .setPosition(2*width*(0.01875) + btnwidth, 2*width*(0.025) + btnheight*1.25)
+//                     .setSize(btnwidth/4, btnheight/2)
+//                     .setColorBackground(color(220, 160, 40))
+//                     .setColorForeground(color(180, 120, 0))
+//                     .setColorActive(color(100, 100, 100))
+//                     .setLabel("Set");
+//  }
+//}
 
-void hideButton() {
-  if (SetDistance != null) {
-    cp5.remove("SetDistance"); // Remove button
-    SetDistance = null; // Set to null so we can re-add it later
-    distColor = color(220, 150, 50);
-    SetisPressed = false;
-    SendData("set");
-  }
-}
+//void hideButton() {
+//  if (SetDistance != null) {
+//    cp5.remove("SetDistance"); // Remove button
+//    SetDistance = null; // Set to null so we can re-add it later
+//    distColor = color(220, 150, 50);
+//    SetisPressed = false;
+//    SendData("set");
+//  }
+//}
 
 void drawBorderedBox(float x, float y, float w, float h, int fillColor) {
   stroke(fillColor); // Border color
