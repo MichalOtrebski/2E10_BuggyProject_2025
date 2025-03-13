@@ -15,6 +15,10 @@ Button Mode;
 Button SetDistance;
 Slider speedSlider;
 
+Slider KpSlider;
+Slider KiSlider;
+Slider KdSlider;
+
 GTextField DistanceDisplay;
 GLabel DistanceLabel;
 
@@ -34,6 +38,10 @@ int sliderSpeed;
 double speed = 0;
 boolean obstacle = false;
 boolean showRed = false;
+
+float kp;
+float ki;
+float kd;
 
 int btnwidth, btnheight;
 boolean StartisPressed = false;
@@ -101,7 +109,6 @@ void setup() {
   DistanceLabel.setTextBold();
   DistanceLabel.setLocalColor(G4P.TEXT, color(255));
   
-  
   DistanceTrav = new GTextField(this, width*(0.025)+ btnwidth/4, 4*width*(0.025) + 3*btnheight, btnwidth/2, btnheight/2);
   DistanceTrav.setFont(customFont);
   DistanceTrav.setText(travelled + " m");
@@ -126,6 +133,35 @@ void setup() {
      .setColorForeground(color(40, 200, 200)) // Slider color
      .setColorBackground(color(100)) // Background color
      .setColorActive(color(0, 160, 160)); // Color when sliding
+
+  KpSlider = cp5.addSlider("kp")
+     .setPosition()
+     .setSize(40, Math.round(width*(0.025)+2*btnheight))
+     .setRange(0, 50)
+     .setValue(kp)
+     .setColorForeground(color(172, 222, 170))
+     .setColorBackground(color(100))
+     .setColorActive(color(143, 187, 175));
+     
+   KiSlider = cp5.addSlider("ki")
+     .setPosition()
+     .setSize(40, Math.round(width*(0.025)+2*btnheight))
+     .setRange(0, 25)
+     .setValue(ki)
+     .setColorForeground(color(172, 222, 170))
+     .setColorBackground(color(100))
+     .setColorActive(color(143, 187, 175));
+     
+   KdSlider = cp5.addSlider("kd")
+     .setPosition()
+     .setSize(40, Math.round(width*(0.025)+2*btnheight))
+     .setRange(0, 20)
+     .setValue(kd)
+     .setColorForeground(color(172, 222, 170))
+     .setColorBackground(color(100))
+     .setColorActive(color(143, 187, 175));
+
+
      
   speedometer = new Meter(this, Math.round(3*width*(0.025)+1.5*btnwidth) + 40, Math.round(width*(0.025)), false);
   
@@ -235,6 +271,21 @@ void controlEvent(ControlEvent event) {
     float bit_8 = sliderSpeed/100.0*255.0;
     SendData("speed:" + str(bit_8));
     println(str(bit_8));
+  
+  } else if (event.isController() && event.getController().getName().equals("kp")) {
+    kp = (float) event.getController().getValue();
+    SendData("speed:" + str(kp));
+    println(str(kp));
+  
+  } else if (event.isController() && event.getController().getName().equals("ki")) {
+    ki = (float) event.getController().getValue();
+    SendData("speed:" + str(ki));
+    println(str(ki));
+  
+  } else if (event.isController() && event.getController().getName().equals("kd")) {
+    kd = (float) event.getController().getValue();
+    SendData("speed:" + str(kd));
+    println(str(kd));
   }
 }
 
