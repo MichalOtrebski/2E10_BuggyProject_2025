@@ -382,11 +382,28 @@ void sortData(String data) {
     }
     Serial.println(Data.mode);
   }
+
+  else if (data.indexOf("kp") != std::string::npos) {
+    int sep = data.indexOf(":");
+    turningKp = data.substring(sep+1).toFloat();
+    turningPID.SetTunings(turningKp, turningKi, turningKd);
+  }
+
+  else if (data.indexOf("ki") != std::string::npos) {
+    int sep = data.indexOf(":");
+    turningKi = data.substring(sep+1).toFloat();
+    turningPID.SetTunings(turningKp, turningKi, turningKd);
+  }
+
+  else if (data.indexOf("kd") != std::string::npos) {
+    int sep = data.indexOf(":");
+    turningKd = data.substring(sep+1).toFloat();
+    turningPID.SetTunings(turningKp, turningKi, turningKd);
+  }
 }
 
 // CHECKS FOR CLIENTS AND IF ONE IS AVAILABLE WE WILL SEE IF DATA IS AVAILABLE TO READ FROM IT
 void ServerExchange() {
-
 
   // checks if there is no client, or if the client has disconnected and will assign one if possible otherwise terminate the function since the rest of the function 
   if (!client || !client.connected()) {
