@@ -54,7 +54,7 @@ void setup() {
   }).start();
   
   if (arduino.active()) {
-    connected = true;
+    connected = true;  
   }
   
   cp5 = new ControlP5(this);

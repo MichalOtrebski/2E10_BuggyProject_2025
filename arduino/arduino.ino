@@ -70,7 +70,7 @@ const int timeout = 500000;
 bool L_IR_O; 
 bool R_IR_O;
 
-bool black = false; //! true == on black surface || false == on light surface
+bool black = true; //! true == on black surface || false == on light surface
 
 // Vars for Computing Loop Execution Time
 unsigned long starting;
@@ -94,9 +94,9 @@ double turningInput;
 double turningSetpoint = 0;
 double turningOutput;
 
-double turningKp = 35;
-double turningKi = 1; 
-double turningKd = 10;
+double turningKp = 16;
+double turningKi = 1.25; 
+double turningKd = 3.25;
 
 // STRAIGHT PID VARIABLES
 double straightInput = 15;
@@ -104,7 +104,7 @@ double straightSetpoint = 15;
 double straightOutput;
 
 double straightKp = 10;
-double straightKi = 1; 
+double straightKi = 0;
 double straightKd = 0; 
 
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
@@ -120,6 +120,8 @@ int scaledTurnSpeed; // scaled speed based on user input
 int TurningSpeed; // computed turning speed based on PID and scaled turn speed
 
 bool set = false;
+
+void forward(int = 130);
 
 void setup() {
   Serial.begin(115200); // debugging serial
@@ -197,8 +199,10 @@ void loop() {
 
       if (Data.obstacle){
         stop();
+      } else if (Data.distance == 0) {
+        forward();
       } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-        forward(130);
+        forward((int)straightOutput);
       } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
         left();
       } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
@@ -217,10 +221,10 @@ void loop() {
   }
 
   ending = micros();
-  //Serial.println("speed: " + String(straightOutput));
+  Serial.println("speed: " + String(straightOutput));
   //printDebug();
 
-  Serial.println(String(ending - starting));
+  // Serial.println(String(ending - starting));
 }
 
 //* Initialises All Pins to the Correct State
