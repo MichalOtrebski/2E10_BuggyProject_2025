@@ -43,7 +43,7 @@ struct LocalData{
   double distance = 0;
   double travelled = 0;
   int speed = 0;
-  int BuggySpeed = 0;
+  double BuggySpeed = 0;
 };
 
 // ENCODER DATA STORAGE
@@ -94,34 +94,46 @@ double turningInput;
 double turningSetpoint = 0;
 double turningOutput;
 
-double turningKp = 16;
-double turningKi = 1.25; 
-double turningKd = 3.25;
+double turningKp = 20;
+double turningKi = 1; 
+double turningKd = 4;
 
-// STRAIGHT PID VARIABLES
-double straightInput = 15;
-double straightSetpoint = 15; 
-double straightOutput;
+// REFERENCESPEED PID VARIABLES
+double ReferenceSpeedInput;
+double ReferenceSpeedSetpoint = 0.0; 
+double ReferenceSpeedOutput;
 
-double straightKp = 10;
-double straightKi = 0;
-double straightKd = 0; 
+double ReferenceSpeedKp = 0.50;
+double ReferenceSpeedKi = 1;
+double ReferenceSpeedKd = 0; 
+
+// REFERENCEOBJECT PID VARIABLES
+double ReferenceObjectInput = 15;
+double ReferenceObjectSetpoint = 15; 
+double ReferenceObjectOutput;
+
+double ReferenceObjectKp = 6.5;
+double ReferenceObjectKi = 2.5;
+double ReferenceObjectKd = 0;
+
+double CF;
 
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
-PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, REVERSE);
-PID straightPID(&straightInput, &straightOutput, &straightSetpoint, straightKp, straightKi, straightKd, REVERSE);
+PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
+PID ReferenceSpeedPID(&ReferenceSpeedInput, &ReferenceSpeedOutput, &ReferenceSpeedSetpoint, ReferenceSpeedKp, ReferenceSpeedKi, ReferenceSpeedKd, DIRECT);
+PID ReferenceObjectPID(&ReferenceObjectInput, &ReferenceObjectOutput, &ReferenceObjectSetpoint, ReferenceObjectKp, ReferenceObjectKi, ReferenceObjectKd, REVERSE);
 
 // left and right wheel speed
 double LeftSpeed;
 double RightSpeed;
 
-int baseTurningSpeed = 100; // base speed for turning
+int baseTurningSpeed = 130; // base speed for turning
 int scaledTurnSpeed; // scaled speed based on user input
 int TurningSpeed; // computed turning speed based on PID and scaled turn speed
 
 bool set = false;
 
-void forward(int = 130);
+void forward(int = 150);
 
 void setup() {
   Serial.begin(115200); // debugging serial
@@ -132,7 +144,8 @@ void setup() {
   server.begin(); // start the server
 
   turningPID.SetMode(AUTOMATIC); // changes the mode for the PID from manual to automatic, meaning itll automatically compute the output based on the difference between input and setpoint
-  straightPID.SetMode(AUTOMATIC);
+  ReferenceSpeedPID.SetMode(AUTOMATIC);
+  ReferenceObjectPID.SetMode(AUTOMATIC);
 
   PinInitialise(); // Initialise all the Pins
 }
@@ -167,20 +180,37 @@ void loop() {
     obstacle(); // Reads distance and checks for obstacles
 
     // from testing the pid worked when the input was -1 so i made the input -1 no matter which sensor is active
-    turningInput = abs(L_IR_O - R_IR_O);
+    turningSetpoint = abs(L_IR_O - R_IR_O);
+    turningInput = 0;
     turningPID.Compute(); // computes the PID
+    turningPID.SetOutputLimits(60, 255);
 
-    scaledTurnSpeed = baseTurningSpeed + Data.speed*(0.3); // scales the turning speed based on the user set speed
+    //scaledTurnSpeed = baseTurningSpeed + Data.speed*(0.3); // scales the turning speed based on the user set speed
     TurningSpeed = constrain(turningOutput, 0, 255);  // constrains the PID output to an 8 Bit value
 
     // DEFAULT MODE
     if (Data.mode == 0) {
+ 
+      ReferenceSpeedInput = Data.BuggySpeed;
+      ReferenceSpeedPID.Compute();
+      ReferenceSpeedPID.SetOutputLimits(0, 70); 
 
-      //! CODE TO BE REFINED, NOT FINAL, WITH MINOR BUGS
+      // if (Data.speed != 0 && Data.BuggySpeed != 0) {
+      //   CF = Data.BuggySpeed / Data.speed;
+      // } else {
+
+      // }
+
+      CF = 3.64;
+
+      int speed = constrain(ReferenceSpeedOutput * CF, 0, 255);
+     
+      Serial.println(ReferenceSpeedOutput);
+
       if (Data.obstacle) {
         stop();
       } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-        forward(Data.speed);
+        forward(speed);
       } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
         left();
       } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
@@ -193,16 +223,19 @@ void loop() {
     // REFERENCE OBJECT MODE
     else if (Data.mode == 1) {
 
-      straightInput = Data.distance;
-      straightPID.Compute();
-      straightPID.SetOutputLimits(70, 255); 
+      ReferenceObjectInput = Data.distance;
+      ReferenceObjectPID.Compute();
+      ReferenceObjectPID.SetOutputLimits(60, 255); 
+      Data.speed = (int)ReferenceObjectOutput;
 
       if (Data.obstacle){
         stop();
-      } else if (Data.distance == 0) {
-        forward();
       } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-        forward((int)straightOutput);
+        if (Data.distance != 0) {
+          forward((int)ReferenceObjectOutput);
+        } else {
+          forward();
+        }
       } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
         left();
       } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
@@ -221,10 +254,14 @@ void loop() {
   }
 
   ending = micros();
-  Serial.println("speed: " + String(straightOutput));
-  //printDebug();
+  // Serial.println("speed: " + String(straightOutput));
 
-  // Serial.println(String(ending - starting));
+    if (now - prev >= 100) {
+    //printDebug();
+    prev = now;
+  }
+
+  Serial.println(String(ending - starting));
 }
 
 //* Initialises All Pins to the Correct State
@@ -304,7 +341,7 @@ void left() {
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
-  analogWrite(R_MOT, scaledTurnSpeed + TurningSpeed);
+  analogWrite(R_MOT, TurningSpeed);
 
 }
 
@@ -313,7 +350,7 @@ void right() {
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
-  analogWrite(L_MOT, scaledTurnSpeed + TurningSpeed);
+  analogWrite(L_MOT, TurningSpeed);
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
@@ -370,21 +407,20 @@ void sortData(String data) {
   // if message is enable we want to invert the state of enable
   if (data.indexOf("enable") != std::string::npos) {
     Data.enable = !Data.enable;
-  } 
+  }
 
   // if data contains speed we want to take the substring following : out and cast to an int
   else if (data.indexOf("speed") != std::string::npos) {  
     int sep = data.indexOf(":");
-    Data.speed = data.substring(sep+1).toInt();
-  } 
-  
+    ReferenceSpeedSetpoint = data.substring(sep+1).toFloat();
+  }
+
   // if data is changeMode we want to increment mode, and keep it within some predefined range
   else if (data.indexOf("changeMode") != std::string::npos) {
     Data.mode++;
     if (Data.mode > 1) {
       Data.mode = 0;
     }
-    Serial.println(Data.mode);
   }
 
   else if (data.indexOf("kp") != std::string::npos) {
@@ -414,6 +450,10 @@ void ServerExchange() {
     client = server.available();
     if (client) {
       Serial.println("Client connected");
+      
+      client.print("kp:" + String(turningKp) + "\n");
+      client.print("ki:" + String(turningKi) + "\n");
+      client.print("kd:" + String(turningKd) + "\n");
     } else {
       return;
     }
@@ -447,6 +487,7 @@ void LeftHallISR() {
 void RightHallISR() {
   unsigned long current = micros();
   float dt = (current - rightHall.last) / 1.0e6;
+
   rightHall.last = current;
 
   rightHall.pulse++;
@@ -475,33 +516,38 @@ void printDebug() {
 
   Serial.println("------------------");
 
-  Serial.print("ENABLE: ");
-  Serial.println(Data.enable);
+  // Serial.print("ENABLE: ");
+  // Serial.println(Data.enable);
 
-  Serial.print("LEFT IR: ");
-  Serial.println(L_IR_O);
-  Serial.print("RIGHT IR: ");
-  Serial.println(R_IR_O);
+  // Serial.print("LEFT IR: ");
+  // Serial.println(L_IR_O);
+  // Serial.print("RIGHT IR: ");
+  // Serial.println(R_IR_O);
 
-  Serial.print("SPEED: ");
-  Serial.println(String(Data.speed));
+  // Serial.print("SPEED: ");
+  // Serial.println(String(Data.speed));
 
-  Serial.print("DISTANCE: ");
-  Serial.println(Data.distance);
+  // Serial.print("DISTANCE: ");
+  // Serial.println(Data.distance);
 
-  Serial.print("MODE: ");
-  Serial.println(String(Data.mode));
+  // Serial.print("MODE: ");
+  // Serial.println(String(Data.mode));
 
-  Serial.print("OBS: ");
-  Serial.println(String(Data.obstacle));
+  // Serial.print("OBS: ");
+  // Serial.println(String(Data.obstacle));
   
-  Serial.print("input: ");
-  Serial.println(String(turningInput)); 
+  // Serial.print("input: ");
+  // Serial.println(String(turningInput)); 
 
-  Serial.print("output: ");
-  Serial.println(turningOutput);
+  // Serial.print("output: ");
+  // Serial.println(turningOutput);
 
-  Serial.println("loop:" + String(ending - starting));
+  // Serial.println("loop:" + String(ending - starting));
 
-  Serial.println("------------------");
+  // Serial.print("KP: ");
+  // Serial.println(turningKp);
+  // Serial.print("KI: ");
+  // Serial.println(turningKi);
+  // Serial.print("KD: ");
+  // Serial.println(turningKd);
 }

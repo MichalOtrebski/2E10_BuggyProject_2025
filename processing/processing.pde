@@ -34,7 +34,7 @@ boolean isOn = false;
 int mode = 0;
 String distance = "0";
 String travelled = "0";
-int sliderSpeed;
+float sliderSpeed;
 double speed = 0;
 boolean obstacle = false;
 boolean showRed = false;
@@ -49,6 +49,8 @@ boolean SetisPressed = false;
 
 int distColor = color(220, 150, 50);
 int borderwidth = 5;
+
+Font customFont = new Font("Arial", Font.PLAIN ,24);
 
 void setup() {
   size(1400, 800);
@@ -70,7 +72,7 @@ void setup() {
   btnwidth = width/7;
   btnheight = height/10;
   
-  Font customFont = new Font("Arial", Font.PLAIN ,24);
+  
   
   Start = cp5.addButton("enable")
       .setPosition(width*(0.025), width*(0.025))
@@ -81,7 +83,6 @@ void setup() {
       .setColorActive(color(100, 100, 100));
 
   Start.getCaptionLabel().setSize(20);
-  
  
   Mode = cp5.addButton("changeMode")
       .setPosition(width*(0.025), 2 * width*(0.025) + btnheight)
@@ -127,35 +128,40 @@ void setup() {
 
   speedSlider = cp5.addSlider("speed")
      .setPosition(2*width*(0.025)+1.25*btnwidth, width*(0.025)) // X, Y position
-     .setSize(40, Math.round(width*(0.025)+2*btnheight)) // Width, Height
-     .setRange(0, 100) // Min & Max values
+     .setSize(40, 2*Math.round(width*(0.025)+2*btnheight)) // Width, Height
+     .setRange(0, 70) // Min & Max values
      .setValue(sliderSpeed) // Default value
      .setColorForeground(color(40, 200, 200)) // Slider color
      .setColorBackground(color(100)) // Background color
-     .setColorActive(color(0, 160, 160)); // Color when sliding
+     .setColorActive(color(0, 160, 160)) // Color when sliding
+     .setNumberOfTickMarks(10)
+     .snapToTickMarks(false);
+     
+  speedSlider.getCaptionLabel().setSize(10);
+  speedSlider.getValueLabel().setSize(20);
 
   KpSlider = cp5.addSlider("kp")
-     .setPosition()
-     .setSize(40, Math.round(width*(0.025)+2*btnheight))
-     .setRange(0, 50)
+     .setPosition(width - (btnwidth*0.5 + Math.round(width*(0.025)+2*btnheight)), width*(0.025))
+     .setSize(40, Math.round(width*(0.025)+2*btnheight)*3)
+     .setRange(0, 30)
      .setValue(kp)
      .setColorForeground(color(172, 222, 170))
      .setColorBackground(color(100))
      .setColorActive(color(143, 187, 175));
      
    KiSlider = cp5.addSlider("ki")
-     .setPosition()
-     .setSize(40, Math.round(width*(0.025)+2*btnheight))
-     .setRange(0, 25)
+     .setPosition(width - (Math.round(width*(0.025)+2*btnheight)), width*(0.025))
+     .setSize(40, Math.round(width*(0.025)+2*btnheight)*3)
+     .setRange(0, 15)
      .setValue(ki)
      .setColorForeground(color(172, 222, 170))
      .setColorBackground(color(100))
      .setColorActive(color(143, 187, 175));
      
    KdSlider = cp5.addSlider("kd")
-     .setPosition()
-     .setSize(40, Math.round(width*(0.025)+2*btnheight))
-     .setRange(0, 20)
+     .setPosition(width-btnwidth*0.5, width*(0.025))
+     .setSize(40, Math.round(width*(0.025)+2*btnheight)*3)
+     .setRange(0, 15)
      .setValue(kd)
      .setColorForeground(color(172, 222, 170))
      .setColorBackground(color(100))
@@ -177,6 +183,7 @@ void setup() {
   speedometer.setScaleLabels(scaleLabels);
 
   speedometer.setDisplayDigitalMeterValue(true);
+  
 }
 
 void draw() {
@@ -263,28 +270,27 @@ void controlEvent(ControlEvent event) {
       SetDistance.setColorForeground(color(180, 120, 0));
       distColor = color(220, 150, 50);
     }
-    
+
     SendData("set");
     
   } else if (event.isController() && event.getController().getName().equals("speed")) {
-    sliderSpeed = (int) event.getController().getValue();
-    float bit_8 = sliderSpeed/100.0*255.0;
-    SendData("speed:" + str(bit_8));
-    println(str(bit_8));
+    sliderSpeed = (float) event.getController().getValue();
+    SendData("speed:" + str(sliderSpeed));
+    println(str(sliderSpeed));
   
   } else if (event.isController() && event.getController().getName().equals("kp")) {
     kp = (float) event.getController().getValue();
-    SendData("speed:" + str(kp));
+    SendData("kp:" + str(kp));
     println(str(kp));
   
   } else if (event.isController() && event.getController().getName().equals("ki")) {
     ki = (float) event.getController().getValue();
-    SendData("speed:" + str(ki));
+    SendData("ki:" + str(ki));
     println(str(ki));
   
   } else if (event.isController() && event.getController().getName().equals("kd")) {
     kd = (float) event.getController().getValue();
-    SendData("speed:" + str(kd));
+    SendData("kd:" + str(kd));
     println(str(kd));
   }
 }
@@ -322,7 +328,7 @@ void listen() {
   while(connected) {
     if (arduino.available() > 0) {
       //println("connected");
-        
+      
       data = arduino.readStringUntil('\n');
       data.trim();
       int sep = data.indexOf(":");
@@ -343,7 +349,16 @@ void listen() {
         case "travelled":
           travelled = value;
           break;
-      }
+        case "kp":
+        KpSlider.setValue(Float.parseFloat(value));
+          break;
+        case"ki":
+        KiSlider.setValue(Float.parseFloat(value));
+          break;
+        case"kd":
+        KdSlider.setValue(Float.parseFloat(value));        
+          break;
+      }  
     }
   }
 }
