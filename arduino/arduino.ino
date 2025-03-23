@@ -4,6 +4,9 @@
 #include <PID_v1.h>       //* PID Library for Computing PID Output
 #include <string>         // String implementation library
 #include <math.h>         // math library, just used for PI
+#include <vector>
+
+#include <HUSKYLENS.h>
 
 // WIFI SERVICE SET ID AND PASSWORD
 char ssid[] = "Y13ARDUINO";
@@ -14,7 +17,7 @@ WiFiServer server(5200);
 WiFiClient client;
 
 //* IR sensor Pins
-const int IR_LEFT = 18; // 18
+const int IR_LEFT = 1; // 18
 const int IR_RIGHT = 9; // 9
 
 //* US Rangefinder Pin
@@ -54,8 +57,15 @@ struct EncoderData {
   volatile unsigned long last;
 };
 
+enum state {
+  NORMAL,
+  WAIT_LINE,
+  TURNING
+};
+
 LocalData Data; //* Current Data
 LocalData PrevData; //* Previous Data to Compare
+state BuggyState = NORMAL;
 
 // Initialise default encoder structs for left and right wheel encoder
 EncoderData leftHall = {0, 0.0, 0.0, 0};
@@ -141,10 +151,14 @@ int TurningSpeed;
 
 bool set = false;
 
+HUSKYLENS huskylens;
+int TagID = 0;
+
 void forward(int = 150);
 
 void setup() {
   Serial.begin(115200); // debugging serial
+  Wire.begin();
 
   WiFi.beginAP(ssid, pass); // start Access Point
   WiFi.config(IPAddress(192, 168, 1, 1)); // static IP
@@ -158,6 +172,11 @@ void setup() {
   turningPID.SetSampleTime(50);
   ReferenceSpeedPID.SetSampleTime(50);
   ReferenceObjectPID.SetSampleTime(50);
+
+  while(!huskylens.begin(Wire)){
+    Serial.println("Huskylens begin failed!");  
+    delay(1000);
+  }
 
   PinInitialise(); // Initialise all the Pins
 }
@@ -184,6 +203,8 @@ void loop() {
     ServerExchange();
     prev_send = now;
   }
+
+  ReadCamera();
 
   // ON/OFF
   if (Data.enable) {
@@ -255,35 +276,63 @@ void loop() {
       Data.speed = (int)ReferenceObjectOutput;
     }
 
-    if (Data.obstacle){
-      stop();
-    } else if (Data.mode == 0 && ReferenceSpeedSetpoint == 0) {
-      stop();
-    } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-      if (Data.mode == 0) {
-        forward(Data.speed);
-      } else if (Data.mode == 1 && Data.distance != 0) {
-        forward(Data.speed);
-      } else {
-        forward();
-      }
-    } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
-      if (sharpTurn) {
-        sharpLeft();
-      } else {
-        left();
-      }
-    } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
-      if (sharpTurn) {
-        sharpRight();
-      } else {
-        right();
-      }
-    } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
-      stop();
-    }
-  }
+    // if (Data.obstacle){
+    //   stop();
+    // } else if (Data.mode == 0 && ReferenceSpeedSetpoint == 0) {
+    //   stop();
+    // } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
+    //   if (Data.mode == 0) {
+    //     forward(Data.speed);
+    //   } else if (Data.mode == 1 && Data.distance != 0) {
+    //     forward(Data.speed);
+    //   } else {
+    //     forward();
+    //   }
+    // } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
+    //   if (sharpTurn) {
+    //     sharpLeft();
+    //   } else {
+    //     left();
+    //   }
+    // } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
+    //   if (sharpTurn) {
+    //     sharpRight();
+    //   } else {
+    //     right();
+    //   }
+    // } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
+    //   stop();
+    // }
 
+    if (BuggyState == NORMAL) {
+      ReadCamera();
+
+      
+
+      if () {
+
+
+      }
+
+    }
+
+    switch (BuggyState) {
+      case NORMAL:
+
+
+        break;
+
+      case WAIT_LINE:
+
+        break;
+
+      case TURNING:
+
+        break;
+    }
+
+  }
+  
   // WHEN BUGGY IS OFF
   else {
     stop();
@@ -429,6 +478,34 @@ void sharpRight() {
   analogWrite(R_MOT, 0);
 }
 
+void junctionTurn() {
+
+  if () {
+
+    digitalWrite(LEFT1, LOW);
+    digitalWrite(LEFT2, HIGH);
+    analogWrite(L_MOT, 0);
+
+    digitalWrite(RIGHT1, LOW);
+    digitalWrite(RIGHT2, HIGH);
+    analogWrite(R_MOT, scaledTurnSpeed + TurningSpeed);
+  } else if () {
+
+    digitalWrite(LEFT1, LOW);
+    digitalWrite(LEFT2, HIGH);
+    analogWrite(L_MOT, scaledTurnSpeed + TurningSpeed);
+
+    digitalWrite(RIGHT1, LOW);
+    digitalWrite(RIGHT2, HIGH);
+    analogWrite(R_MOT, 0);
+  }
+
+  
+
+  
+
+}
+
 // STOP 
 void stop() {
 
@@ -499,7 +576,7 @@ void sortData(String data) {
   // if data is changeMode we want to increment mode, and keep it within some predefined range
   else if (data.indexOf("changeMode") != std::string::npos) {
     Data.mode++;
-    if (Data.mode > 1) {
+    if (Data.mode > 2) {
       Data.mode = 0;
     }
   }
@@ -590,6 +667,36 @@ void checkTimeout() {
     if (current - rightHall.last > timeout) {
         rightHall.speed = 0.0;
     }
+}
+
+int area(int x, int y) {
+  return x*y;
+}
+
+void ReadCamera() {
+
+  if (!huskylens.request())  {
+    Serial.println("Request Failed.");
+  } else if (!huskylens.isLearned()) {
+    Serial.println("Nothing learned.");
+  } else if (huskylens.available()) {
+    int blockCount = huskylens.countBlocks();
+    int blockArea[blockCount] = { 0 };
+
+    std::vector<HUSKYLENSResult> blocks;
+    blocks.push_back(huskylens.read());
+
+    HUSKYLENSResult max = blocks[0];
+    
+    for (int i = 1; i < blockCount-1; i++) {
+      blocks.push_back(huskylens.read());
+      if (area(blocks[i].width, blocks[i].height) > area(max.width, max.height)) {
+        max = blocks[i];
+      }
+    }
+
+    TagID = max.ID;
+  }
 }
 
 //* Prints Some Debug Info over Serial
