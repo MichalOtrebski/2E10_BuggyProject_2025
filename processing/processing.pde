@@ -9,11 +9,15 @@ String data;
 boolean connected = false;
 
 ControlP5 cp5;
-
+  
 Button Start;
 Button Mode;
 Button SetDistance;
 Slider speedSlider;
+
+Slider KpSlider;
+Slider KiSlider;
+Slider KdSlider;
 
 GTextField DistanceDisplay;
 GLabel DistanceLabel;
@@ -30,10 +34,14 @@ boolean isOn = false;
 int mode = 0;
 String distance = "0";
 String travelled = "0";
-int sliderSpeed;
+float sliderSpeed;
 double speed = 0;
 boolean obstacle = false;
 boolean showRed = false;
+
+float kp;
+float ki;
+float kd;
 
 int btnwidth, btnheight;
 boolean StartisPressed = false;
@@ -41,6 +49,8 @@ boolean SetisPressed = false;
 
 int distColor = color(220, 150, 50);
 int borderwidth = 5;
+
+Font customFont = new Font("Arial", Font.PLAIN ,24);
 
 void setup() {
   size(1400, 800);
@@ -54,7 +64,7 @@ void setup() {
   }).start();
   
   if (arduino.active()) {
-    connected = true;
+    connected = true;  
   }
   
   cp5 = new ControlP5(this);
@@ -62,7 +72,7 @@ void setup() {
   btnwidth = width/7;
   btnheight = height/10;
   
-  Font customFont = new Font("Arial", Font.PLAIN ,24);
+  
   
   Start = cp5.addButton("enable")
       .setPosition(width*(0.025), width*(0.025))
@@ -73,7 +83,6 @@ void setup() {
       .setColorActive(color(100, 100, 100));
 
   Start.getCaptionLabel().setSize(20);
-  
  
   Mode = cp5.addButton("changeMode")
       .setPosition(width*(0.025), 2 * width*(0.025) + btnheight)
@@ -101,7 +110,6 @@ void setup() {
   DistanceLabel.setTextBold();
   DistanceLabel.setLocalColor(G4P.TEXT, color(255));
   
-  
   DistanceTrav = new GTextField(this, width*(0.025)+ btnwidth/4, 4*width*(0.025) + 3*btnheight, btnwidth/2, btnheight/2);
   DistanceTrav.setFont(customFont);
   DistanceTrav.setText(travelled + " m");
@@ -120,27 +128,62 @@ void setup() {
 
   speedSlider = cp5.addSlider("speed")
      .setPosition(2*width*(0.025)+1.25*btnwidth, width*(0.025)) // X, Y position
-     .setSize(40, Math.round(width*(0.025)+2*btnheight)) // Width, Height
-     .setRange(0, 100) // Min & Max values
+     .setSize(40, 2*Math.round(width*(0.025)+2*btnheight)) // Width, Height
+     .setRange(0, 50) // Min & Max values
      .setValue(sliderSpeed) // Default value
      .setColorForeground(color(40, 200, 200)) // Slider color
      .setColorBackground(color(100)) // Background color
-     .setColorActive(color(0, 160, 160)); // Color when sliding
+     .setColorActive(color(0, 160, 160)) // Color when sliding
+     .setNumberOfTickMarks(10)
+     .snapToTickMarks(false);
+
+  speedSlider.getCaptionLabel().setSize(10);
+  speedSlider.getValueLabel().setSize(20);
+
+  KpSlider = cp5.addSlider("kp")
+     .setPosition(width - (btnwidth*0.5 + Math.round(width*(0.025)+2*btnheight)), width*(0.025))
+     .setSize(40, Math.round(width*(0.025)+2*btnheight)*3)
+     .setRange(0, 70)
+     .setValue(kp)
+     .setColorForeground(color(172, 222, 170))
+     .setColorBackground(color(100))
+     .setColorActive(color(143, 187, 175));
+     
+   KiSlider = cp5.addSlider("ki")
+     .setPosition(width - (Math.round(width*(0.025)+2*btnheight)), width*(0.025))
+     .setSize(40, Math.round(width*(0.025)+2*btnheight)*3)
+     .setRange(0, 50)
+     .setValue(ki)
+     .setColorForeground(color(172, 222, 170))
+     .setColorBackground(color(100))
+     .setColorActive(color(143, 187, 175));
+     
+   KdSlider = cp5.addSlider("kd")
+     .setPosition(width-btnwidth*0.5, width*(0.025))
+     .setSize(40, Math.round(width*(0.025)+2*btnheight)*3)
+     .setRange(0, 40)
+     .setValue(kd)
+     .setColorForeground(color(172, 222, 170))
+     .setColorBackground(color(100))
+     .setColorActive(color(143, 187, 175));
+
+
      
   speedometer = new Meter(this, Math.round(3*width*(0.025)+1.5*btnwidth) + 40, Math.round(width*(0.025)), false);
   
-  String[] scaleLabels = {"0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100"};
+  String[] scaleLabels = {"0", "10", "20", "30", "40", "50", "60", "70", "80"};
   
   
   speedometer.setMeterWidth(350);
   speedometer.setMinScaleValue(0.0);
-  speedometer.setMaxScaleValue(100);
+  speedometer.setMaxScaleValue(80);
   speedometer.setMinInputSignal(0);
-  speedometer.setMaxInputSignal(100);
+  speedometer.setMaxInputSignal(80);
   speedometer.setTitle("Speed [cm/s]");
   speedometer.setScaleLabels(scaleLabels);
 
   speedometer.setDisplayDigitalMeterValue(true);
+  
 }
 
 void draw() {
@@ -170,7 +213,6 @@ void draw() {
       background(50);
   }
   
-    
   speedometer.updateMeter((int)speed);   
 
   drawBorderedBox(width*(0.025)+ btnwidth/4 - borderwidth, 3*width*(0.025) + 2*btnheight - borderwidth, btnwidth/2 + borderwidth*2, btnheight/2 + borderwidth*2, distColor);
@@ -181,7 +223,7 @@ void controlEvent(ControlEvent event) {
   if (event.isController() && event.getController().getName().equals("enable")) {
     StartisPressed = !StartisPressed; // Toggle state
     if (StartisPressed) {
-      Start.setColorBackground(color(230, 100, 100)); // New color
+      Start.setColorBackground(color(230, 100, 100)); // New color 
       Start.setColorForeground(color(180, 70, 70));
       Start.setLabel("Turn OFF");
     } else {
@@ -210,9 +252,9 @@ void controlEvent(ControlEvent event) {
     }
     
     if (mode == 1) {
-      showButton();
+      //showButton();
     } else{
-      hideButton();
+      //hideButton();
     }
     
     SendData("changeMode");
@@ -228,38 +270,52 @@ void controlEvent(ControlEvent event) {
       SetDistance.setColorForeground(color(180, 120, 0));
       distColor = color(220, 150, 50);
     }
-    
+
     SendData("set");
     
   } else if (event.isController() && event.getController().getName().equals("speed")) {
-    sliderSpeed = (int) event.getController().getValue();
-    float bit_8 = sliderSpeed/100.0*255.0;
-    SendData("speed:" + str(bit_8));
-    println(str(bit_8));
+    sliderSpeed = (float) event.getController().getValue();
+    SendData("speed:" + str(sliderSpeed));
+    println(str(sliderSpeed));
+  
+  } else if (event.isController() && event.getController().getName().equals("kp")) {
+    kp = (float) event.getController().getValue();
+    SendData("kp:" + str(kp));
+    println(str(kp));
+  
+  } else if (event.isController() && event.getController().getName().equals("ki")) {
+    ki = (float) event.getController().getValue();
+    SendData("ki:" + str(ki));
+    println(str(ki));
+  
+  } else if (event.isController() && event.getController().getName().equals("kd")) {
+    kd = (float) event.getController().getValue();
+    SendData("kd:" + str(kd));
+    println(str(kd));
   }
 }
 
-void showButton() {
-  if (SetDistance == null) { // Only add if it doesn't exist
-    SetDistance = cp5.addButton("SetDistance")
-                     .setPosition(2*width*(0.01875) + btnwidth, 2*width*(0.025) + btnheight*1.25)
-                     .setSize(btnwidth/4, btnheight/2)
-                     .setColorBackground(color(220, 160, 40))
-                     .setColorForeground(color(180, 120, 0))
-                     .setColorActive(color(100, 100, 100))
-                     .setLabel("Set");
-  }
-}
+//void showButton() {
+//  if (SetDistance == null) { // Only add if it doesn't exist
+//    SetDistance = cp5.addButton("SetDistance")
+//                     .setPosition(2*width*(0.01875) + btnwidth, 2*width*(0.025) + btnheight*1.25)
+//                     .setSize(btnwidth/4, btnheight/2)
+//                     .setColorBackground(color(220, 160, 40))
+//                     .setColorForeground(color(180, 120, 0))
+//                     .setColorActive(color(100, 100, 100))
+//                     .setLabel("Set");
+//  }
+//}
 
-void hideButton() {
-  if (SetDistance != null) {
-    cp5.remove("SetDistance"); // Remove button
-    SetDistance = null; // Set to null so we can re-add it later
-    distColor = color(220, 150, 50);
-    SetisPressed = false;
-    SendData("set");
-  }
-}
+//void hideButton() {
+//  if (SetDistance != null) {
+//    cp5.remove("SetDistance"); // Remove button
+//    SetDistance = null; // Set to null so we can re-add it later
+//    distColor = color(220, 150, 50);
+//    SetisPressed = false;
+//    SendData("set");
+//  }
+//}
 
 void drawBorderedBox(float x, float y, float w, float h, int fillColor) {
   stroke(fillColor); // Border color
@@ -272,7 +328,7 @@ void listen() {
   while(connected) {
     if (arduino.available() > 0) {
       //println("connected");
-        
+      
       data = arduino.readStringUntil('\n');
       data.trim();
       int sep = data.indexOf(":");
@@ -282,7 +338,7 @@ void listen() {
       switch(type) {
         case "buggyspeed":
           speed = Double.parseDouble(value);
-          println((int)speed);
+          println((float)speed);
           break;
         case "obstacle":
           obstacle = value.equals("1\n");
@@ -293,7 +349,16 @@ void listen() {
         case "travelled":
           travelled = value;
           break;
-      }
+        case "kp":
+        KpSlider.setValue(Float.parseFloat(value));
+          break;
+        case"ki":
+        KiSlider.setValue(Float.parseFloat(value));
+          break;
+        case"kd":
+        KdSlider.setValue(Float.parseFloat(value));        
+          break;
+      }  
     }
   }
 }
