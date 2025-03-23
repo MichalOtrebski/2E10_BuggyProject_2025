@@ -9,7 +9,7 @@ String data;
 boolean connected = false;
 
 ControlP5 cp5;
-
+  
 Button Start;
 Button Mode;
 Button SetDistance;
@@ -129,14 +129,14 @@ void setup() {
   speedSlider = cp5.addSlider("speed")
      .setPosition(2*width*(0.025)+1.25*btnwidth, width*(0.025)) // X, Y position
      .setSize(40, 2*Math.round(width*(0.025)+2*btnheight)) // Width, Height
-     .setRange(0, 70) // Min & Max values
+     .setRange(0, 50) // Min & Max values
      .setValue(sliderSpeed) // Default value
      .setColorForeground(color(40, 200, 200)) // Slider color
      .setColorBackground(color(100)) // Background color
      .setColorActive(color(0, 160, 160)) // Color when sliding
      .setNumberOfTickMarks(10)
      .snapToTickMarks(false);
-     
+
   speedSlider.getCaptionLabel().setSize(10);
   speedSlider.getValueLabel().setSize(20);
 
@@ -171,14 +171,14 @@ void setup() {
      
   speedometer = new Meter(this, Math.round(3*width*(0.025)+1.5*btnwidth) + 40, Math.round(width*(0.025)), false);
   
-  String[] scaleLabels = {"0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100"};
+  String[] scaleLabels = {"0", "10", "20", "30", "40", "50", "60", "70", "80"};
   
   
   speedometer.setMeterWidth(350);
   speedometer.setMinScaleValue(0.0);
-  speedometer.setMaxScaleValue(100);
+  speedometer.setMaxScaleValue(80);
   speedometer.setMinInputSignal(0);
-  speedometer.setMaxInputSignal(100);
+  speedometer.setMaxInputSignal(80);
   speedometer.setTitle("Speed [cm/s]");
   speedometer.setScaleLabels(scaleLabels);
 
@@ -338,7 +338,7 @@ void listen() {
       switch(type) {
         case "buggyspeed":
           speed = Double.parseDouble(value);
-          println((int)speed);
+          println((float)speed);
           break;
         case "obstacle":
           obstacle = value.equals("1\n");

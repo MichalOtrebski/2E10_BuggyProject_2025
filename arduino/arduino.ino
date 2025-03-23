@@ -70,7 +70,7 @@ const int timeout = 500000;
 bool L_IR_O; 
 bool R_IR_O;
 
-bool black = false; //! true == on black surface || false == on light surface
+bool black = true; //! true == on black surface || false == on light surface
 
 // Vars for Computing Loop Execution Time
 unsigned long starting;
@@ -96,17 +96,17 @@ double turningOutput;
 
 double OldTurningSetpoint;
 
-double turningKp = 60;
-double turningKi = 35; 
-double turningKd = 6;
+double turningKp = 30;
+double turningKi = 0.5; 
+double turningKd = 12;
 
 // REFERENCESPEED PID VARIABLES
 double ReferenceSpeedInput;
 double ReferenceSpeedSetpoint = 0.0; 
 double ReferenceSpeedOutput;
 
-double ReferenceSpeedKp = 0.50;
-double ReferenceSpeedKi = 0.6;
+double ReferenceSpeedKp = 0.45;
+double ReferenceSpeedKi = 0.45;
 double ReferenceSpeedKd = 0; 
 
 // REFERENCEOBJECT PID VARIABLES
@@ -135,8 +135,9 @@ PID ReferenceObjectPID(&ReferenceObjectInput, &ReferenceObjectOutput, &Reference
 double LeftSpeed;
 double RightSpeed;
 
-int baseTurningSpeed = 80; // base speed for turning
+int baseTurningSpeed = 110; // base speed for turning
 int scaledTurnSpeed; // scaled speed based on user input
+int TurningSpeed;
 
 bool set = false;
 
@@ -198,7 +199,7 @@ void loop() {
         turnStart = millis();
       }
 
-      if (millis() - turnStart > 250) {
+      if (millis() - turnStart > 175) {
         sharpTurn = true;
       }
     } else {
@@ -220,7 +221,8 @@ void loop() {
     turningPID.Compute(); // computes the PID
     turningPID.SetOutputLimits(-255, 255);
 
-    scaledTurnSpeed = baseTurningSpeed + sqrt(Data.speed); // scales the turning speed based on the user set speed
+    scaledTurnSpeed = baseTurningSpeed + Data.speed*(0.3); // scales the turning speed based on the user set speed
+    TurningSpeed = constrain(turningOutput, 0, 255);
 
     Serial.println(turningOutput);
 
@@ -229,7 +231,7 @@ void loop() {
  
       ReferenceSpeedInput = Data.BuggySpeed;
       ReferenceSpeedPID.Compute();
-      ReferenceSpeedPID.SetOutputLimits(0, 70); 
+      ReferenceSpeedPID.SetOutputLimits(15, 70); 
 
       // if (Data.speed != 0 && Data.BuggySpeed != 0) {
       //   CF = Data.BuggySpeed / Data.speed;
@@ -239,21 +241,9 @@ void loop() {
 
       CF = 3.64;
 
-      Data.speed = constrain(ReferenceSpeedOutput * CF, 0, 255);
+      Data.speed = constrain(ReferenceSpeedOutput * CF, 60, 255);
      
       // Serial.println(ReferenceSpeedOutput);
-
-      // if (Data.obstacle) {
-      //   stop();
-      // } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-      //   forward(speed);
-      // } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
-      //   left();
-      // } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
-      //   right();
-      // } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
-      //   stop();
-      // }  
     } 
 
     // REFERENCE OBJECT MODE
@@ -261,51 +251,37 @@ void loop() {
 
       ReferenceObjectInput = Data.distance;
       ReferenceObjectPID.Compute();
-      ReferenceObjectPID.SetOutputLimits(60, 255); 
+      ReferenceObjectPID.SetOutputLimits(60, 240); 
       Data.speed = (int)ReferenceObjectOutput;
-
-      // if (Data.obstacle){
-      //   stop();
-      // } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-      //   if (Data.distance != 0) {
-      //     forward((int)ReferenceObjectOutput);
-      //   } else {
-      //     forward();
-      //   }
-      // } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
-      //   left();
-      // } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
-      //   right();
-      // } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
-      //   stop();
-      // }
     }
 
-      if (Data.obstacle){
-        stop();
-      } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-        if (Data.mode == 0) {
-          forward(Data.speed);
-        } else if (Data.mode == 1 && Data.distance != 0) {
-          forward(Data.speed);
-        } else {
-          forward();
-        }
-      } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
-        if (Data.speed > 140 && sharpTurn) {
-          sharpLeft();
-        } else {
-          left();
-        }
-      } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
-        if (Data.speed > 140 && sharpTurn) {
-          sharpRight();
-        } else {
-          right();
-        }
-      } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
-        stop();
+    if (Data.obstacle){
+      stop();
+    } else if (Data.mode == 0 && ReferenceSpeedSetpoint == 0) {
+      stop();
+    } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
+      if (Data.mode == 0) {
+        forward(Data.speed);
+      } else if (Data.mode == 1 && Data.distance != 0) {
+        forward(Data.speed);
+      } else {
+        forward();
       }
+    } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
+      if (sharpTurn) {
+        sharpLeft();
+      } else {
+        left();
+      }
+    } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
+      if (sharpTurn) {
+        sharpRight();
+      } else {
+        right();
+      }
+    } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
+      stop();
+    }
   }
 
   // WHEN BUGGY IS OFF
@@ -399,11 +375,11 @@ void left() {
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
-  analogWrite(L_MOT, constrain(baseTurningSpeed + turningOutput, 0, 255));
+  analogWrite(L_MOT, 0);
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
-  analogWrite(R_MOT, constrain(scaledTurnSpeed - turningOutput, 0, 255));
+  analogWrite(R_MOT, scaledTurnSpeed + TurningSpeed);
 
 }
 
@@ -412,27 +388,27 @@ void right() {
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
-  analogWrite(L_MOT, constrain(scaledTurnSpeed + turningOutput, 0, 255));
+  analogWrite(L_MOT, scaledTurnSpeed + TurningSpeed);
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
-  analogWrite(R_MOT, constrain(baseTurningSpeed - turningOutput, 0, 255));
+  analogWrite(R_MOT, 0);
 }
 
 void sharpLeft() {
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
-  analogWrite(R_MOT, constrain(scaledTurnSpeed - turningOutput, 0, 255));
+  analogWrite(R_MOT, scaledTurnSpeed + TurningSpeed);
 
-  digitalWrite(LEFT1, HIGH);
-  digitalWrite(LEFT2, LOW);
-  analogWrite(L_MOT, constrain(baseTurningSpeed + turningOutput, 0, 255));
+  // digitalWrite(LEFT1, HIGH);
+  // digitalWrite(LEFT2, LOW);
+  // analogWrite(L_MOT, 40);
 
-  delay(5);
+  // delay(10);
 
   digitalWrite(LEFT1, LOW);
-  digitalWrite(LEFT2, HIGH);
+  digitalWrite(LEFT2, LOW);
   analogWrite(L_MOT, 0);
 }
 
@@ -440,16 +416,16 @@ void sharpRight() {
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
-  analogWrite(L_MOT, constrain(scaledTurnSpeed + turningOutput, 0, 255));
+  analogWrite(L_MOT, scaledTurnSpeed + TurningSpeed);
 
-  digitalWrite(RIGHT1, HIGH);
-  digitalWrite(RIGHT2, LOW);
-  analogWrite(R_MOT, constrain(baseTurningSpeed - turningOutput, 0, 255));
+  // digitalWrite(RIGHT1, HIGH);
+  // digitalWrite(RIGHT2, LOW);
+  // analogWrite(R_MOT, 50);
 
-  delay(5);
+  // delay(10);
 
   digitalWrite(RIGHT1, LOW);
-  digitalWrite(RIGHT2, HIGH);
+  digitalWrite(RIGHT2, LOW);
   analogWrite(R_MOT, 0);
 }
 
@@ -467,10 +443,14 @@ void stop() {
   Data.BuggySpeed = 0;
   
   ReferenceSpeedPID.SetMode(MANUAL);
-  ReferenceSpeedOutput = 0;
+  ReferenceSpeedOutput = 0.10;
   delay(5);
   ReferenceSpeedPID.SetMode(AUTOMATIC);
   
+  ReferenceObjectPID.SetMode(MANUAL);
+  ReferenceObjectOutput = 50;
+  delay(5);
+  ReferenceObjectPID.SetMode(AUTOMATIC);
 }
 
 // CHECKS WHICH VALUES IF ANY HAVE CHANGED, SENDS THEM, AND THEN CHANGES THE STATE OF PrevData TO REFLECT THE CHANGE
