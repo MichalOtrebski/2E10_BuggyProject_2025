@@ -193,7 +193,7 @@ void loop() {
   } else {
     Data.BuggySpeed = 0.0;
   }
-  
+
   Data.travelled = (leftHall.distance + rightHall.distance) / 2.0; // average distance travelled between the two wheels
 
   CheckAndSend();
@@ -231,7 +231,7 @@ void loop() {
     if (turningSetpoint != OldTurningSetpoint) {
       turningPID.SetMode(MANUAL);
       turningOutput = 0;
-      delay(5);
+      delayMicrosecond(5);
       turningPID.SetMode(AUTOMATIC);
 
       // Serial.println("RESET");
@@ -521,12 +521,12 @@ void stop() {
   
   ReferenceSpeedPID.SetMode(MANUAL);
   ReferenceSpeedOutput = 0.10;
-  delay(5);
+  delayMicroseconds(5);
   ReferenceSpeedPID.SetMode(AUTOMATIC);
   
   ReferenceObjectPID.SetMode(MANUAL);
   ReferenceObjectOutput = 50;
-  delay(5);
+  delayMicroseconds(5);
   ReferenceObjectPID.SetMode(AUTOMATIC);
 }
 
