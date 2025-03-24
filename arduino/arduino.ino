@@ -200,7 +200,7 @@ void loop() {
   } else {
     Data.BuggySpeed = 0.0;
   }
-  
+
   Data.travelled = (leftHall.distance + rightHall.distance) / 2.0; // average distance travelled between the two wheels
 
   CheckAndSend();
