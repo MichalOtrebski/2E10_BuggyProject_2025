@@ -136,6 +136,11 @@ int leftTurn;
 unsigned long turnStart = 0;
 bool sharpTurn = false;
 
+unsigned long nowCam;
+unsigned long prev_Cam;
+
+unsigned long tagTimeout = 0;
+
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
 PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
 PID ReferenceSpeedPID(&ReferenceSpeedInput, &ReferenceSpeedOutput, &ReferenceSpeedSetpoint, ReferenceSpeedKp, ReferenceSpeedKi, ReferenceSpeedKd, DIRECT);
@@ -153,12 +158,14 @@ bool set = false;
 
 HUSKYLENS huskylens;
 int TagID = 0;
+int lastID = 0;
 
 void forward(int = 150);
 
 void setup() {
   Serial.begin(115200); // debugging serial
   Wire.begin();
+  Wire.setClock( 400000UL);
 
   WiFi.beginAP(ssid, pass); // start Access Point
   WiFi.config(IPAddress(192, 168, 1, 1)); // static IP
@@ -204,7 +211,10 @@ void loop() {
     prev_send = now;
   }
 
-  ReadCamera();
+  // if (now- prev_Cam >= 200) {
+  //   ReadCamera();
+  //   prev_Cam = now;
+  // }
 
   // ON/OFF
   if (Data.enable) {
@@ -231,11 +241,8 @@ void loop() {
     if (turningSetpoint != OldTurningSetpoint) {
       turningPID.SetMode(MANUAL);
       turningOutput = 0;
-      delay(5);
+      delayMicroseconds(5);
       turningPID.SetMode(AUTOMATIC);
-
-      // Serial.println("RESET");
-
       OldTurningSetpoint = turningSetpoint;
     }
 
@@ -245,7 +252,7 @@ void loop() {
     scaledTurnSpeed = baseTurningSpeed + Data.speed*(0.3); // scales the turning speed based on the user set speed
     TurningSpeed = constrain(turningOutput, 0, 255);
 
-    Serial.println(turningOutput);
+    // Serial.println(turningOutput);
 
     // DEFAULT MODE
     if (Data.mode == 0) {
@@ -253,12 +260,6 @@ void loop() {
       ReferenceSpeedInput = Data.BuggySpeed;
       ReferenceSpeedPID.Compute();
       ReferenceSpeedPID.SetOutputLimits(15, 70); 
-
-      // if (Data.speed != 0 && Data.BuggySpeed != 0) {
-      //   CF = Data.BuggySpeed / Data.speed;
-      // } else {
-
-      // }
 
       CF = 3.64;
 
@@ -276,61 +277,34 @@ void loop() {
       Data.speed = (int)ReferenceObjectOutput;
     }
 
-    // if (Data.obstacle){
-    //   stop();
-    // } else if (Data.mode == 0 && ReferenceSpeedSetpoint == 0) {
-    //   stop();
-    // } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
-    //   if (Data.mode == 0) {
-    //     forward(Data.speed);
-    //   } else if (Data.mode == 1 && Data.distance != 0) {
-    //     forward(Data.speed);
-    //   } else {
-    //     forward();
-    //   }
-    // } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
-    //   if (sharpTurn) {
-    //     sharpLeft();
-    //   } else {
-    //     left();
-    //   }
-    // } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
-    //   if (sharpTurn) {
-    //     sharpRight();
-    //   } else {
-    //     right();
-    //   }
-    // } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
-    //   stop();
-    // }
-
     if (BuggyState == NORMAL) {
-      ReadCamera();
 
-      
-
-      if () {
-
-
+      if (now - prev_Cam >= 200) {
+        ReadCamera();
+        prev_Cam = now;
       }
 
+      if (TagID != 0 && ((millis() - tagTimeout) > 2000)) {
+        BuggyState = WAIT_LINE;
+        TagID = 0;
+      }
     }
+
+    // Serial.println(TagID);
 
     switch (BuggyState) {
       case NORMAL:
-
-
+        move();
         break;
 
       case WAIT_LINE:
-
+        move();
         break;
-
+        
       case TURNING:
-
+        junctionTurn();
         break;
     }
-
   }
   
   // WHEN BUGGY IS OFF
@@ -347,6 +321,8 @@ void loop() {
     //printDebug();
     prev = now;
   }
+
+  // Serial.println(BuggyState);
 
   // Serial.println(String(ending - starting));
 }
@@ -454,7 +430,7 @@ void sharpLeft() {
   // digitalWrite(LEFT2, LOW);
   // analogWrite(L_MOT, 40);
 
-  // delay(10);
+  // delayMicroseconds(10);
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, LOW);
@@ -471,7 +447,7 @@ void sharpRight() {
   // digitalWrite(RIGHT2, LOW);
   // analogWrite(R_MOT, 50);
 
-  // delay(10);
+  // delayMicroseconds(10);
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, LOW);
@@ -480,30 +456,26 @@ void sharpRight() {
 
 void junctionTurn() {
 
-  if () {
+  if (TagID == 1) {
 
-    digitalWrite(LEFT1, LOW);
-    digitalWrite(LEFT2, HIGH);
-    analogWrite(L_MOT, 0);
+    left();
+    if (R_IR_O) {
+      forward(Data.speed);
+      BuggyState = NORMAL;
+      TagID = 0;
+      tagTimeout = millis();
+    }
 
-    digitalWrite(RIGHT1, LOW);
-    digitalWrite(RIGHT2, HIGH);
-    analogWrite(R_MOT, scaledTurnSpeed + TurningSpeed);
-  } else if () {
+  } else if (TagID == 2) {
 
-    digitalWrite(LEFT1, LOW);
-    digitalWrite(LEFT2, HIGH);
-    analogWrite(L_MOT, scaledTurnSpeed + TurningSpeed);
-
-    digitalWrite(RIGHT1, LOW);
-    digitalWrite(RIGHT2, HIGH);
-    analogWrite(R_MOT, 0);
+    right();
+    if (L_IR_O) {
+      forward(Data.speed);
+      BuggyState = NORMAL;
+      TagID = 0;
+      tagTimeout = millis();
+    }
   }
-
-  
-
-  
-
 }
 
 // STOP 
@@ -521,12 +493,12 @@ void stop() {
   
   ReferenceSpeedPID.SetMode(MANUAL);
   ReferenceSpeedOutput = 0.10;
-  delay(5);
+  delayMicroseconds(5);
   ReferenceSpeedPID.SetMode(AUTOMATIC);
   
   ReferenceObjectPID.SetMode(MANUAL);
   ReferenceObjectOutput = 50;
-  delay(5);
+  delayMicroseconds(5);
   ReferenceObjectPID.SetMode(AUTOMATIC);
 }
 
@@ -696,6 +668,51 @@ void ReadCamera() {
     }
 
     TagID = max.ID;
+  }
+}
+
+void move() {
+
+  if (Data.obstacle){
+    stop();
+  } else if (Data.mode == 0 && ReferenceSpeedSetpoint == 0) {
+    stop();
+  } else if (L_IR_O && R_IR_O) {  // IF BOTH PINS ARE ON, MEANING LINE IS IN THE MIDDLE
+    if (Data.mode == 0) {
+      forward(Data.speed);
+    } else if (Data.mode == 1 && Data.distance != 0) {
+      forward(Data.speed);
+    } else {
+      forward();
+    }
+  } else if (!L_IR_O && R_IR_O) { // IF LEFT PIN TURNS OFF AND RIGHT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT
+    if (sharpTurn) {
+      sharpLeft();
+    } else {
+      left();
+    }
+  } else if (!R_IR_O && L_IR_O) { // IF RIGHT PIN TURNS OFF AND LEFT PIN STAYS ON, MEANING LEFT IR SENSOR IS TRIPPED, TURN LEFT  
+    if (sharpTurn) {
+      sharpRight();
+    } else {
+      right();
+    }
+  } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
+    if (BuggyState == NORMAL) {
+    //   if (Data.mode == 0) {
+    //   forward(Data.speed);
+    //   } else if (Data.mode == 1 && Data.distance != 0) {
+    //     forward(Data.speed);
+    //   } else {
+    //     forward();
+    //   }
+
+    stop();
+    } else if (BuggyState == WAIT_LINE) {
+      if (!L_IR_O && !R_IR_O ) {
+       BuggyState = TURNING;
+      }
+    } 
   }
 }
 
