@@ -165,7 +165,7 @@ void forward(int = 150);
 void setup() {
   Serial.begin(115200); // debugging serial
   Wire.begin();
-  Wire.setClock( 400000UL);
+  Wire.setClock(400000UL);
 
   WiFi.beginAP(ssid, pass); // start Access Point
   WiFi.config(IPAddress(192, 168, 1, 1)); // static IP
@@ -211,11 +211,6 @@ void loop() {
     prev_send = now;
   }
 
-  // if (now- prev_Cam >= 200) {
-  //   ReadCamera();
-  //   prev_Cam = now;
-  // }
-
   // ON/OFF
   if (Data.enable) {
 
@@ -254,6 +249,18 @@ void loop() {
 
     // Serial.println(turningOutput);
 
+    if (BuggyState == NORMAL) {
+
+      if (now - prev_Cam >= 200 && ((millis() - tagTimeout) > 2000)) {
+        ReadCamera();
+        prev_Cam = now;
+      }
+
+      if (TagID != 0) {
+        BuggyState = WAIT_LINE;
+      }
+    }
+
     // DEFAULT MODE
     if (Data.mode == 0) {
  
@@ -277,20 +284,7 @@ void loop() {
       Data.speed = (int)ReferenceObjectOutput;
     }
 
-    if (BuggyState == NORMAL) {
-
-      if (now - prev_Cam >= 200) {
-        ReadCamera();
-        prev_Cam = now;
-      }
-
-      if (TagID != 0 && ((millis() - tagTimeout) > 2000)) {
-        BuggyState = WAIT_LINE;
-        TagID = 0;
-      }
-    }
-
-    // Serial.println(TagID);
+    Serial.println(TagID);
 
     switch (BuggyState) {
       case NORMAL:
@@ -458,19 +452,27 @@ void junctionTurn() {
 
   if (TagID == 1) {
 
-    left();
-    if (R_IR_O) {
+    if (!L_IR_O && !R_IR_O) {
+      sharpLeft();
+    } else if (L_IR_O) {
       forward(Data.speed);
+    }   
+
+    if (R_IR_O && !L_IR_O) {
+      move();
       BuggyState = NORMAL;
       TagID = 0;
       tagTimeout = millis();
     }
 
   } else if (TagID == 2) {
-
-    right();
-    if (L_IR_O) {
+    if (!L_IR_O && !R_IR_O) {
+      sharpRight();
+    } else if (R_IR_O) {
       forward(Data.speed);
+    } 
+    if (L_IR_O && !R_IR_O) {
+      move();
       BuggyState = NORMAL;
       TagID = 0;
       tagTimeout = millis();
@@ -481,13 +483,27 @@ void junctionTurn() {
 // STOP 
 void stop() {
 
+  if (Data.BuggySpeed > 0) {
+
+  digitalWrite(LEFT1, HIGH);
+  digitalWrite(LEFT2, LOW);
+  analogWrite(L_MOT, 60);
+
+  digitalWrite(RIGHT1, HIGH);
+  digitalWrite(RIGHT2, LOW);
+  analogWrite(R_MOT, 60);
+
+  delay(5);
+
   digitalWrite(LEFT1, LOW);
-  digitalWrite(LEFT2, HIGH);
-  analogWrite(L_MOT, 0);
+  digitalWrite(LEFT2, LOW);
+  analogWrite(L_MOT, 0);   
 
   digitalWrite(RIGHT1, LOW);
-  digitalWrite(RIGHT2, HIGH);
+  digitalWrite(RIGHT2, LOW);
   analogWrite(R_MOT, 0);
+
+  }
 
   Data.BuggySpeed = 0;
   
@@ -699,17 +715,18 @@ void move() {
     }
   } else {  // IF BOTH PINS ARE OFF, LIKE WHEN YOU LIFT THE CAR FROM THE TRACK
     if (BuggyState == NORMAL) {
-    //   if (Data.mode == 0) {
-    //   forward(Data.speed);
-    //   } else if (Data.mode == 1 && Data.distance != 0) {
-    //     forward(Data.speed);
-    //   } else {
-    //     forward();
-    //   }
+      if (Data.mode == 0) {
+      forward(Data.speed);
+      } else if (Data.mode == 1 && Data.distance != 0) {
+        forward(Data.speed);
+      } else {
+        forward();
+      }
 
-    stop();
+    // stop();
     } else if (BuggyState == WAIT_LINE) {
       if (!L_IR_O && !R_IR_O ) {
+        // stop();
        BuggyState = TURNING;
       }
     } 
