@@ -1,23 +1,22 @@
-// LIBRARIES
-#include <WiFiS3.h>       // WiFi library for arduino specifically for the ESP32-S3-MINI-1
+/* #region LIBRARIES */
 #include <NewPing.h>      //* Library for the HC-SR04 US Rangefinder, it does the rangefinding
 #include <PID_v1.h>       //* PID Library for Computing PID Output
-#include <string>         // String implementation library
-#include <math.h>         // math library, just used for PI
-#include <vector>
+#include <PacketSerial.h> //* Library for Communication Between ESP32 and Renesas
 
-#include <HUSKYLENS.h>
+#include <functional>     //* Tools for Function Objecst, Lambdas and std::funciton Wrappers
+#include <unordered_map>  //* Hash Table-Based Container Library
+#include <string>         //* String implementation library
+#include <math.h>         //* math library, just used for PI
+#include <vector>         //* Vector Library for Dynamic Arrays
 
-// WIFI SERVICE SET ID AND PASSWORD
-char ssid[] = "Y13ARDUINO";
-char pass[] = "123456789";
+#include <HUSKYLENS.h>    //* Huskylens Library for Tag Regonition
 
-// INITIALISE SERVER ON PORT 5200 AND A CLIENT OBJECT
-WiFiServer server(5200);
-WiFiClient client;
+/* #endregion */
+
+/* #region PINS */
 
 //* IR sensor Pins
-const int IR_LEFT = 1; // 18
+const int IR_LEFT = 1; // 1
 const int IR_RIGHT = 9; // 9
 
 //* US Rangefinder Pin
@@ -38,15 +37,20 @@ const int RIGHT_HALL = 3; // 3
 const int L_MOT = 5;  // PWM pins 5
 const int R_MOT = 6;  // PWM pins 6
 
-//* LOCAL DATA STORAGE
+/* #endregion */
+
+/* #region STRUCTS */
+
+//* Local Data Storage
 struct LocalData{
   bool enable = false;
   int mode = 0;
   bool obstacle = false;
   double distance = 0;
-  double travelled = 0;
+  double travelled;
   int speed = 0;
-  double BuggySpeed = 0;
+  int BuggySpeed = 0;
+  int TagID = 0;
 };
 
 // ENCODER DATA STORAGE
@@ -63,6 +67,21 @@ enum state {
   TURNING
 };
 
+//* Packet for Sending Command and value Pairs
+template<typename T>
+struct __attribute__((packed)) DataPacket {
+  char command[4];
+  T value;
+
+  DataPacket(const char cmd[4], T val) : value(val) {
+    memcpy(command, cmd, 4);  // Copy the command into the structure
+  }
+};
+
+/* #endregion */
+
+/* #region VARIABLES */
+
 LocalData Data; //* Current Data
 LocalData PrevData; //* Previous Data to Compare
 state BuggyState = NORMAL;
@@ -71,8 +90,11 @@ state BuggyState = NORMAL;
 EncoderData leftHall = {0, 0.0, 0.0, 0};
 EncoderData rightHall = {0, 0.0, 0.0, 0};
 
+PacketSerial serialPacket;  //* Packet Serial object
+
 //Pulses Per Revolution
 const double PPR = 4.0;
+
 const float CIRCUM = 6.5 * M_PI; // in cm
 const int timeout = 500000;
 
@@ -92,9 +114,6 @@ const int message_interval = 50;
 // TIMING VARIABLES
 unsigned long now;
 unsigned long prev;
-unsigned long prev_send;
-
-String data;
 
 //*HC-SR04 Sonar
 NewPing sonar(TRIG, ECHO, 50);
@@ -141,11 +160,6 @@ unsigned long prev_Cam;
 
 unsigned long tagTimeout = 0;
 
-// CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
-PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
-PID ReferenceSpeedPID(&ReferenceSpeedInput, &ReferenceSpeedOutput, &ReferenceSpeedSetpoint, ReferenceSpeedKp, ReferenceSpeedKi, ReferenceSpeedKd, DIRECT);
-PID ReferenceObjectPID(&ReferenceObjectInput, &ReferenceObjectOutput, &ReferenceObjectSetpoint, ReferenceObjectKp, ReferenceObjectKi, ReferenceObjectKd, REVERSE);
-
 // left and right wheel speed
 double LeftSpeed;
 double RightSpeed;
@@ -157,20 +171,59 @@ int TurningSpeed;
 bool set = false;
 
 HUSKYLENS huskylens;
-int TagID = 0;
-int lastID = 0;
 
+bool hardStop = true;
+
+// CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
+PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
+PID ReferenceSpeedPID(&ReferenceSpeedInput, &ReferenceSpeedOutput, &ReferenceSpeedSetpoint, ReferenceSpeedKp, ReferenceSpeedKi, ReferenceSpeedKd, DIRECT);
+PID ReferenceObjectPID(&ReferenceObjectInput, &ReferenceObjectOutput, &ReferenceObjectSetpoint, ReferenceObjectKp, ReferenceObjectKi, ReferenceObjectKd, REVERSE);
+
+/* #endregion */
+
+/* #region FUNCTION PROTOTYPES*/
+
+template <typename T>
+void SendUpdate(const char command[4], T value);
+void onPacketReceived(const uint8_t* buffer, size_t size);
+
+void CheckAndSend();
+
+void obstacle();
+void ReadIR();
+
+void move();
 void forward(int = 150);
+void left();
+void sharpLeft();
+void right();
+void sharpRight();
+void junction();
+void stop();
+
+void LeftHallISR();
+void RightHallISR();
+void SpeedAndDistance();
+void checkTimeout();
+
+void ReadCamera();
+void area();
+
+void boot();
+void PinInitialise();
+
+void printDebug();
+
+/* #endregion */
 
 void setup() {
-  Serial.begin(115200); // debugging serial
+  Serial.begin(230400);
+  Serial2.begin(115200);
+  serialPacket.setStream(&Serial2);
+  serialPacket.setPacketHandler(&onPacketReceived);
+
   Wire.begin();
   Wire.setClock(400000UL);
-
-  WiFi.beginAP(ssid, pass); // start Access Point
-  WiFi.config(IPAddress(192, 168, 1, 1)); // static IP
-
-  server.begin(); // start the server
 
   turningPID.SetMode(AUTOMATIC); // changes the mode for the PID from manual to automatic, meaning itll automatically compute the output based on the difference between input and setpoint
   ReferenceSpeedPID.SetMode(AUTOMATIC);
@@ -186,36 +239,24 @@ void setup() {
   }
 
   PinInitialise(); // Initialise all the Pins
+
+  boot();
 }
 
 void loop() {
-  starting = micros(); // Loop start time
-  now = millis(); // used for checking the time of the loop
+  starting = micros();
+  now = millis();
+  serialPacket.update();
 
   checkTimeout();
 
-  // check for numerator 0, dividing 0 by anything is technically compiler specific, but just in case =
-  if (!(leftHall.speed == 0.0 && rightHall.speed == 0.0)) {
-    Data.BuggySpeed = (leftHall.speed + rightHall.speed) / 2.0; // average speed between the two wheels
-  } else {
-    Data.BuggySpeed = 0.0;
-  }
-
-  Data.travelled = (leftHall.distance + rightHall.distance) / 2.0; // average distance travelled between the two wheels
-
-  CheckAndSend();
-
-  // Receive and send data every 200ms to not waste computing time every loop execution
-  if (now - prev_send >= 200) {
-    ServerExchange();
-    prev_send = now;
-  }
+  SpeedAndDistance();
 
   // ON/OFF
   if (Data.enable) {
 
-    ReadIR(); // Reads IR sensors
-    obstacle(); // Reads distance and checks for obstacles
+    ReadIR();
+    obstacle();
 
     turningSetpoint = (L_IR_O - R_IR_O);
 
@@ -255,14 +296,14 @@ void loop() {
         prev_Cam = now;
       }
 
-      if (TagID != 0) {
+      if (Data.TagID != 0) {
         BuggyState = WAIT_LINE;
       }
     }
 
-    // DEFAULT MODE
+    // REFERENCE SPEED MODE
     if (Data.mode == 0) {
- 
+
       ReferenceSpeedInput = Data.BuggySpeed;
       ReferenceSpeedPID.Compute();
       ReferenceSpeedPID.SetOutputLimits(15, 70); 
@@ -276,14 +317,14 @@ void loop() {
 
     // REFERENCE OBJECT MODE
     else if (Data.mode == 1) {
-
+      
       ReferenceObjectInput = Data.distance;
       ReferenceObjectPID.Compute();
       ReferenceObjectPID.SetOutputLimits(60, 240); 
       Data.speed = (int)ReferenceObjectOutput;
-    }
+    } 
 
-    Serial.println(TagID);
+    Serial.println(Data.TagID);
 
     switch (BuggyState) {
       case NORMAL:
@@ -295,54 +336,62 @@ void loop() {
         break;
         
       case TURNING:
-        junctionTurn();
+        junction();
         break;
     }
-  }
-  
-  // WHEN BUGGY IS OFF
+  } 
+
+  // IF MODE IS OUT OF RANGE
   else {
     stop();
     Data.distance = 0;
     Data.obstacle = false;
   }
 
-  ending = micros();
-  // Serial.println("speed: " + String(straightOutput));
+  CheckAndSend();
 
   if (now - prev >= 100) {
     //printDebug();
     prev = now;
   }
 
-  // Serial.println(BuggyState);
 
-  // Serial.println(String(ending - starting));
+  ending = micros();
+
+  // Serial.println(BuggyState);
+  //Serial.println("loop:" + String(ending - starting));
+
 }
 
-//* Initialises All Pins to the Correct State
-void PinInitialise() {
-  // IR SENSORS
-  pinMode(IR_LEFT, INPUT);
-  pinMode(IR_RIGHT, INPUT);
+//* EVENT HANDLER FOR PACKETSERIAL
+void onPacketReceived(const uint8_t* buffer, size_t size) {
 
-  // LEFT MOTOR + HALL
-  pinMode(LEFT1, OUTPUT);
-  pinMode(LEFT2, OUTPUT);
-  pinMode(LEFT_HALL, INPUT_PULLUP); // INPUT_PULLUP uses na internal pullup resistor to restor the state of the pin to HIGH, since the hall effect sensors use an open collector
+  char command[4] = {};
+  memcpy(command, buffer, 4);
 
-  // RIGHT MOTOR + HALL
-  pinMode(RIGHT1, OUTPUT);
-  pinMode(RIGHT2, OUTPUT);
-  pinMode(RIGHT_HALL, INPUT_PULLUP); // INPUT_PULLUP uses na internal pullup resistor to restor the state of the pin to HIGH, since the hall effect sensors use an open collector
+  //* Hashmap for finding which command was sent, and then using the associated lambda function to assign the value.
+  static const std::unordered_map<std::string, std::function<void(const uint8_t*)>> commandMap = {
 
-  // PWM CONTROL PINS
-  pinMode(L_MOT, OUTPUT);
-  pinMode(R_MOT, OUTPUT);
+    {"ENA", [](const uint8_t* buf) { Data.enable = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
+    {"MOD", [](const uint8_t* buf) { Data.mode = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    // {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
+    // {"DIS", [](const uint8_t* buf) { Data.distance = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
+    {"SPD", [](const uint8_t* buf) { ReferenceSpeedSetpoint = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    // {"KPV", [](const uint8_t* buf) { Data.Kp = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
+    // {"KIV", [](const uint8_t* buf) { Data.Ki = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
+    // {"KDV", [](const uint8_t* buf) { Data.Kd = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
+    {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
+  };
 
-  // ATTACHES INTERRUPT AND ISR TO THE ENCODER PINS AND SETS MODE, RISING = TRANSITION FROM LOW -> HIGH
-  attachInterrupt(digitalPinToInterrupt(LEFT_HALL), LeftHallISR, RISING);
-  attachInterrupt(digitalPinToInterrupt(RIGHT_HALL), RightHallISR, RISING);
+  auto it = commandMap.find(command);
+  it->second(buffer);
+}
+
+//* CHECK FOR CHANGES IN VALUES AND IF THEY WERE THEN SEND THE UPDATE TO RENESAS
+template <typename T>
+void SendUpdate(const char command[4], T value) {
+  DataPacket<T> packet(command, value);
+  serialPacket.send((uint8_t*)&packet, sizeof(DataPacket<T>));
 }
 
 //* CHECK IF DISTANCE IS WITHIN LIMITS
@@ -350,14 +399,12 @@ void obstacle() {
 
   //Serial.println("function obstacle is ran:");
 
-  // ONLY PING THE US SENSOR EVERY 50ms
   if (now - prev >= message_interval) {
     Data.distance = sonar.ping_cm();
     prev = now;
   }
 
-  // CHECKS DISTANCE, ADDS A 2CM BUFFER ZONE, BETWEEN 15-17cm
-  if (Data.distance >= 15 || Data.distance <= 0) {
+  if (Data.distance > 20 || Data.distance <= 0) {
     Data.obstacle = false;
   } else if (Data.distance < 15) {
     Data.obstacle = true;
@@ -375,8 +422,8 @@ void ReadIR() {
   }
 }
 
-// GO FORWARD
 void forward(int speed) {
+  hardStop = true;
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
@@ -385,11 +432,11 @@ void forward(int speed) {
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
   analogWrite(R_MOT, speed);
-
 }
 
-// GO LEFT, USES COMPUTED TURNING SPEED AND SCALED TURNING SPEED
 void left() {
+
+  hardStop = true;
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
@@ -401,8 +448,9 @@ void left() {
 
 }
 
-// GO RIGHT, USES COMPUTED TURNING SPEED AND SCALED TURNING SPEED
 void right() {
+
+  hardStop = true;
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
@@ -411,6 +459,7 @@ void right() {
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
   analogWrite(R_MOT, 0);
+
 }
 
 void sharpLeft() {
@@ -447,9 +496,9 @@ void sharpRight() {
   analogWrite(R_MOT, 0);
 }
 
-void junctionTurn() {
+void junction() {
 
-  if (TagID == 1) {
+  if (Data.TagID == 1) {
 
     if (!L_IR_O && !R_IR_O) {
       sharpLeft();
@@ -460,11 +509,11 @@ void junctionTurn() {
     if (R_IR_O && !L_IR_O) {
       move();
       BuggyState = NORMAL;
-      TagID = 0;
+      Data.TagID = 0;
       tagTimeout = millis();
     }
 
-  } else if (TagID == 2) {
+  } else if (Data.TagID == 2) {
     if (!L_IR_O && !R_IR_O) {
       sharpRight();
     } else if (R_IR_O) {
@@ -473,39 +522,37 @@ void junctionTurn() {
     if (L_IR_O && !R_IR_O) {
       move();
       BuggyState = NORMAL;
-      TagID = 0;
+      Data.TagID = 0;
       tagTimeout = millis();
     }
   }
 }
 
-// STOP 
 void stop() {
 
-  if (Data.BuggySpeed > 0) {
+  if (hardStop) {
+    digitalWrite(LEFT1, HIGH);
+    digitalWrite(LEFT2, LOW);
+    analogWrite(L_MOT, 60);
 
-  digitalWrite(LEFT1, HIGH);
-  digitalWrite(LEFT2, LOW);
-  analogWrite(L_MOT, 60);
-
-  digitalWrite(RIGHT1, HIGH);
-  digitalWrite(RIGHT2, LOW);
-  analogWrite(R_MOT, 60);
+    digitalWrite(RIGHT1, HIGH);
+    digitalWrite(RIGHT2, LOW);
+    analogWrite(R_MOT, 60);
 
   delay(5);
-
-  digitalWrite(LEFT1, LOW);
-  digitalWrite(LEFT2, LOW);
-  analogWrite(L_MOT, 0);   
-
-  digitalWrite(RIGHT1, LOW);
-  digitalWrite(RIGHT2, LOW);
-  analogWrite(R_MOT, 0);
-
+  hardStop = false;
   }
 
+  digitalWrite(LEFT1, LOW);
+  digitalWrite(LEFT2, HIGH);
+  analogWrite(L_MOT, 0);
+
+  digitalWrite(RIGHT1, LOW);
+  digitalWrite(RIGHT2, HIGH);
+  analogWrite(R_MOT, 0);
+
   Data.BuggySpeed = 0;
-  
+
   ReferenceSpeedPID.SetMode(MANUAL);
   ReferenceSpeedOutput = 0.10;
   delayMicroseconds(5);
@@ -517,27 +564,32 @@ void stop() {
   ReferenceObjectPID.SetMode(AUTOMATIC);
 }
 
-// CHECKS WHICH VALUES IF ANY HAVE CHANGED, SENDS THEM, AND THEN CHANGES THE STATE OF PrevData TO REFLECT THE CHANGE
+//* SEND UPDATES TO ESP
 void CheckAndSend() {
   bool changed = false;
 
   if (Data.obstacle != PrevData.obstacle) {
-    client.print("obstacle:" + String(Data.obstacle) + '\n');
+    SendUpdate("OBS", Data.obstacle);
     changed = true;
   }
 
   if (Data.distance != PrevData.distance) {
-    client.print("distance:" + String(Data.distance) + '\n');
+    SendUpdate("DIS", Data.distance);
     changed = true;
   }
 
   if (Data.BuggySpeed != PrevData.BuggySpeed) {
-    client.print("buggyspeed:" + String(Data.BuggySpeed) + '\n');
+    SendUpdate("BSP", Data.BuggySpeed);
     changed = true;
   }
 
-  if (Data.travelled != PrevData.travelled) {
-    client.print("travelled:" + String(Data.travelled) + '\n');
+  if (Data.TagID != Data.TagID) {
+    SendUpdate("TAG", Data.TagID);
+    changed = true;
+  }
+
+  if (Data.travelled != Data.travelled) {
+    SendUpdate("TRV", Data.travelled);
     changed = true;
   }
 
@@ -546,72 +598,85 @@ void CheckAndSend() {
   }
 }
 
-// DOES SOMETHING BASED ON THE DATA
-void sortData(String data) {
-
-  // if message is enable we want to invert the state of enable
-  if (data.indexOf("enable") != std::string::npos) {
-    Data.enable = !Data.enable;
-  }
-
-  // if data contains speed we want to take the substring following : out and cast to an int
-  else if (data.indexOf("speed") != std::string::npos) {  
-    int sep = data.indexOf(":");
-    ReferenceSpeedSetpoint = data.substring(sep+1).toFloat();
-  }
-
-  // if data is changeMode we want to increment mode, and keep it within some predefined range
-  else if (data.indexOf("changeMode") != std::string::npos) {
-    Data.mode++;
-    if (Data.mode > 2) {
-      Data.mode = 0;
-    }
-  }
-
-  else if (data.indexOf("kp") != std::string::npos) {
-    int sep = data.indexOf(":");
-    turningKp = data.substring(sep+1).toFloat();
-    turningPID.SetTunings(turningKp, turningKi, turningKd);
-  }
-
-  else if (data.indexOf("ki") != std::string::npos) {
-    int sep = data.indexOf(":");
-    turningKi = data.substring(sep+1).toFloat();
-    turningPID.SetTunings(turningKp, turningKi, turningKd);
-  }
-
-  else if (data.indexOf("kd") != std::string::npos) {
-    int sep = data.indexOf(":");
-    turningKd = data.substring(sep+1).toFloat();
-    turningPID.SetTunings(turningKp, turningKi, turningKd);
-  }
+//* Resend Initial Values Upon Renesas Reset
+void boot() {
+  SendUpdate("ENA", Data.enable);
+  SendUpdate("MOD", Data.mode);
+  SendUpdate("OBS", Data.obstacle);
+  SendUpdate("DIS", Data.distance);
+  SendUpdate("BSP", Data.BuggySpeed);
+  SendUpdate("TAG", Data.TagID);
+  SendUpdate("TRV", Data.travelled);
+  // SendUpdate("KPV", Data.Kp);
+  // SendUpdate("KIV", Data.Ki);
+  // SendUpdate("KDV", Data.Kd);
+  Serial.println("INITAL SENT");
 }
 
-// CHECKS FOR CLIENTS AND IF ONE IS AVAILABLE WE WILL SEE IF DATA IS AVAILABLE TO READ FROM IT
-void ServerExchange() {
+//* Initialises All Pins to the Correct State
+void PinInitialise() {
+  // IR SENSORS
+  pinMode(IR_LEFT, INPUT);
+  pinMode(IR_RIGHT, INPUT);
 
-  // checks if there is no client, or if the client has disconnected and will assign one if possible otherwise terminate the function since the rest of the function 
-  if (!client || !client.connected()) {
-    client = server.available();
-    if (client) {
-      Serial.println("Client connected");
-      
-      client.print("kp:" + String(turningKp) + "\n");
-      client.print("ki:" + String(turningKi) + "\n");
-      client.print("kd:" + String(turningKd) + "\n");
-    } else {
-      return;
-    }
-  }
+  // LEFT MOTOR + HALL
+  pinMode(LEFT1, OUTPUT);
+  pinMode(LEFT2, OUTPUT);
+  pinMode(LEFT_HALL, INPUT_PULLUP); // INPUT_PULLUP uses na internal pullup resistor to restor the state of the pin to HIGH, since the hall effect sensors use an open collector
 
-  // as a precaution check again if the client is connected, then check if there is data available and read it, trim it, then sort it
-  if (client && client.connected()) {
-    if (client.available()) {
-      data = client.readStringUntil('\n');
-      data.trim();
-      sortData(data);
-    }
-  }
+  // RIGHT MOTOR + HALL
+  pinMode(RIGHT1, OUTPUT);
+  pinMode(RIGHT2, OUTPUT);
+  pinMode(RIGHT_HALL, INPUT_PULLUP); // INPUT_PULLUP uses na internal pullup resistor to restor the state of the pin to HIGH, since the hall effect sensors use an open collector
+
+  // PWM CONTROL PINS
+  pinMode(L_MOT, OUTPUT);
+  pinMode(R_MOT, OUTPUT);
+
+  // ATTACHES INTERRUPT AND ISR TO THE ENCODER PINS AND SETS MODE, RISING = TRANSITION FROM LOW -> HIGH
+  attachInterrupt(digitalPinToInterrupt(LEFT_HALL), LeftHallISR, RISING);
+  attachInterrupt(digitalPinToInterrupt(RIGHT_HALL), RightHallISR, RISING);
+}
+
+//* Prints Some Debug Info over Serial
+void printDebug() {
+
+  Serial.println("------------------");
+
+  // Serial.print("ENABLE: ");
+  // Serial.println(Data.enable);
+
+  // Serial.print("LEFT IR: ");
+  // Serial.println(L_IR_O);
+  // Serial.print("RIGHT IR: ");
+  // Serial.println(R_IR_O);
+
+  // Serial.print("SPEED: ");
+  // Serial.println(String(Data.speed));
+
+  // Serial.print("DISTANCE: ");
+  // Serial.println(Data.distance);
+
+  // Serial.print("MODE: ");
+  // Serial.println(String(Data.mode));
+
+  // Serial.print("OBS: ");
+  // Serial.println(String(Data.obstacle));
+  
+  // Serial.print("input: ");
+  // Serial.println(String(turningInput)); 
+
+  // Serial.print("output: ");
+  // Serial.println(turningOutput);
+
+  // Serial.print("Kp: ");
+  // Serial.println(String(Data.Kp));
+  // Serial.print("Ki: ");
+  // Serial.println(String(Data.Ki));
+  // Serial.print("Kd: ");
+  // Serial.println(String(Data.Kd));
+
+  Serial.println("------------------");
 }
 
 //* INTERUPT SERVICE ROUTINE
@@ -626,7 +691,7 @@ void LeftHallISR() {
   if (dt > 0) {
     leftHall.speed = (CIRCUM/PPR) / dt;
   }
-} 
+}
 
 //* INTERUPT SERVICE ROUTINE
 void RightHallISR() {
@@ -643,17 +708,29 @@ void RightHallISR() {
   }
 }
 
-// checks the timeout of the wheel encoders, if the wheels dont spin we dont want to keep the last recorded speed, we instead want it to be zero, so we timeout the wheels after X seconds and set the speed to 0;
+void SpeedAndDistance() {
+
+  // check for numerator 0, dividing 0 by anything is technically compiler specific, but just in case =
+  if (!(leftHall.speed == 0.0 && rightHall.speed == 0.0)) {
+    Data.BuggySpeed = (leftHall.speed + rightHall.speed) / 2.0; // average speed between the two wheels
+  } else {
+    Data.BuggySpeed = 0.0;
+  }
+
+  Data.travelled = (leftHall.distance + rightHall.distance) / 2.0; // average distance travelled between the two wheels
+}
+
 void checkTimeout() {
-    unsigned long current = micros();
 
-    if (current - leftHall.last > timeout) {
-        leftHall.speed = 0.0;
-    }
+  unsigned long current = micros();
 
-    if (current - rightHall.last > timeout) {
-        rightHall.speed = 0.0;
-    }
+  if (current - leftHall.last > timeout) {
+      leftHall.speed = 0.0;
+  }
+
+  if (current - rightHall.last > timeout) {
+      rightHall.speed = 0.0;
+  }
 }
 
 int area(int x, int y) {
@@ -682,7 +759,7 @@ void ReadCamera() {
       }
     }
 
-    TagID = max.ID;
+    Data.TagID = max.ID;
   }
 }
 
@@ -730,45 +807,4 @@ void move() {
       }
     } 
   }
-}
-
-//* Prints Some Debug Info over Serial
-void printDebug() {
-
-  Serial.println("------------------");
-
-  // Serial.print("ENABLE: ");
-  // Serial.println(Data.enable);
-
-  // Serial.print("LEFT IR: ");
-  // Serial.println(L_IR_O);
-  // Serial.print("RIGHT IR: ");
-  // Serial.println(R_IR_O);
-
-  // Serial.print("SPEED: ");
-  // Serial.println(String(Data.speed));
-
-  // Serial.print("DISTANCE: ");
-  // Serial.println(Data.distance);
-
-  // Serial.print("MODE: ");
-  // Serial.println(String(Data.mode));
-
-  // Serial.print("OBS: ");
-  // Serial.println(String(Data.obstacle));
-  
-  // Serial.print("input: ");
-  // Serial.println(String(turningInput)); 
-
-  // Serial.print("output: ");
-  // Serial.println(turningOutput);
-
-  // Serial.println("loop:" + String(ending - starting));
-
-  // Serial.print("KP: ");
-  // Serial.println(turningKp);
-  // Serial.print("KI: ");
-  // Serial.println(turningKi);
-  // Serial.print("KD: ");
-  // Serial.println(turningKd);
 }

@@ -1,0 +1,257 @@
+/* General Styles */
+body {
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+@media (max-width: 768px) {
+    .desktop-only {
+      display: none;
+    }
+}
+
+.container {
+    margin: auto;
+    display: flex;
+    width: 90%;
+    height: 80%;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: #1e1e1e;
+}
+
+.slidecontainer {
+    width: 75%; /* Width of the outside container */
+    height: 5px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* The slider itself */
+  .slider {
+    align-self: center;
+    -webkit-appearance: none;  /* Override default CSS styles */
+    appearance: none;
+    width: 100%; /* Full-width */
+    height: 15px; /* Specified height */
+    background: #d3d3d3; /* Grey background */
+    outline: none; /* Remove outline */
+    opacity: 0.7; /* Set transparency (for mouse-over effects on hover) */
+    -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+    transition: opacity .2s;
+  }
+  
+  /* Mouse-over effects */
+  .slider:hover {
+    opacity: 0.5; /* Fully shown on mouse-over */
+  }
+  
+  /* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Override default look */
+    appearance: none;
+    width: 15%; /* Set a specific slider handle width */
+    height: 15px; /* Slider handle height */
+    background: #00cc66; /* Green background */
+    cursor: pointer; /* Cursor on hover */
+  }
+  
+  .slider::-moz-range-thumb {
+    width: 15px;
+    height: 25px;
+    background: #177bff;
+    cursor: pointer;
+  }
+
+/* Left Panel */
+.left-panel {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: #1e1e1e;
+    padding: 20px;
+}
+
+.controls {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.start {
+    background-color: #00cc66;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 15px 25px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.start:hover {
+    background-color: #028a3f;
+}
+
+.changemode {
+    background-color: #838074;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 15px 25px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-top: 10px;
+}
+
+.changemode:hover {
+    background-color: #5f5a52;
+}
+
+button {
+    padding: 15px 25px;
+    font-size: 16px;
+    width: 40%;
+    align-self: center;
+    cursor: pointer;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    transition: background-color 0.3s ease;
+}
+
+/* Hazard Triangle */
+.hazard-triangle {
+    width: 0;
+    height: 0;
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-bottom: 25px solid red;
+    margin: 20px auto;
+    opacity: 0; /* Hidden by default */
+}
+
+.hazard-triangle.active {
+    animation: flash 1s infinite;
+    opacity: 1;
+}
+
+@keyframes flash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Speedometer Section */
+.speedometer-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+#gaugeCanvas {
+    background: transparent;
+    display: block;
+}
+
+input[type="range"] {
+    width: 80%;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    height: 15px;
+    width: 15px;
+    background: #0066cc;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* Distance and Travelled displayed side by side */
+.distance-container {
+    align-self: center;
+    display: flex;
+    justify-content: space-between;
+    width: 60%;
+}
+
+.distance-section {
+    flex: 1;
+    text-align: center;
+}
+
+/* Debug Panel */
+.debug-panel {
+    background: #2c2c2c;
+    padding: 15px;
+    border-radius: 5px;
+    border-top: 2px solid #444;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.debug-panel h3 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    color: #ddd;
+}
+
+.debug-panel p {
+    font-size: 14px;
+    margin: 15px 0;
+}
+
+.debug-panel span {
+    font-weight: bold;
+    color: #0066cc;
+}
+
+/* Right Panel (split into top and bottom sections) */
+.right-panel {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    background: #2a2a2a;
+    color: #bbb;
+    font-style: italic;
+    font-size: 18px;
+}
+
+.top-right,
+.bottom-right {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.top-right {
+    border-bottom: 2px solid #444;
+}
+
+/* Directional Indicator inside the top-right section */
+.direction-indicator {
+    font-size: 24px;
+}
+
+@media screen and (max-width: 768px) {
+    .distance-container {
+        flex-direction: column;
+    }
+}
+
