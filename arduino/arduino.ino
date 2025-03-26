@@ -6,6 +6,8 @@
 #include <math.h>         // math library, just used for PI
 #include <vector>
 
+#include "Arduino_LED_Matrix.h"
+
 #include <HUSKYLENS.h>
 
 // WIFI SERVICE SET ID AND PASSWORD
@@ -15,6 +17,8 @@ char pass[] = "123456789";
 // INITIALISE SERVER ON PORT 5200 AND A CLIENT OBJECT
 WiFiServer server(5200);
 WiFiClient client;
+
+ArduinoLEDMatrix matrix;
 
 //* IR sensor Pins
 const int IR_LEFT = 1; // 18
@@ -63,6 +67,8 @@ enum state {
   TURNING
 };
 
+HUSKYLENSResult result;
+
 LocalData Data; //* Current Data
 LocalData PrevData; //* Previous Data to Compare
 state BuggyState = NORMAL;
@@ -98,6 +104,9 @@ String data;
 
 //*HC-SR04 Sonar
 NewPing sonar(TRIG, ECHO, 50);
+
+// int focal =  //apparent + 20 / 5;
+// int ActualWidth = 5;
 
 // TURNING PID VARIABLES
 double turningInput = 0; 
@@ -166,6 +175,8 @@ void setup() {
   Serial.begin(115200); // debugging serial
   Wire.begin();
   Wire.setClock(400000UL);
+
+  matrix.begin();
 
   WiFi.beginAP(ssid, pass); // start Access Point
   WiFi.config(IPAddress(192, 168, 1, 1)); // static IP
@@ -256,10 +267,30 @@ void loop() {
         prev_Cam = now;
       }
 
-      if (TagID != 0) {
+      if (TagID == 1 || TagID == 2) {
         BuggyState = WAIT_LINE;
       }
     }
+
+    if (TagID == 3) {
+      
+      // int apparentWidth = result.width;
+
+      // int distance = (ActualWidth * focal) / apparentWidth;
+
+      // int something = map(distance, 10, 50, 15, ReferenceSpeedSetpoint);
+
+      // Serial.println(something);
+
+
+  } else if (TagID == 4) {
+
+    Data.speed = 30;
+    client.print("sliderspeed:30\n");
+    Serial.println("sent");
+    TagID = 0;
+
+  }
 
     // DEFAULT MODE
     if (Data.mode == 0) {
@@ -284,7 +315,7 @@ void loop() {
       Data.speed = (int)ReferenceObjectOutput;
     }
 
-    Serial.println(TagID);
+    // Serial.println(TagID);
 
     switch (BuggyState) {
       case NORMAL:
@@ -477,7 +508,7 @@ void junctionTurn() {
       TagID = 0;
       tagTimeout = millis();
     }
-  }
+  } 
 }
 
 // STOP 
@@ -682,8 +713,11 @@ void ReadCamera() {
         max = blocks[i];
       }
     }
-
+    result = max;
     TagID = max.ID;
+
+    Serial.println(area(result.width, result.height));
+
   }
 }
 
