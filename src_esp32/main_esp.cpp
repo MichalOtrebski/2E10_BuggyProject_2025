@@ -38,10 +38,10 @@ struct LocalData{
   bool enable = false;
   int mode = 0;
   bool obstacle = false;
-  double distance = 0;
-  double travelled;
+  int distance = 0;
+  float travelled = 0;
   int speed = 0;
-  int BuggySpeed = 0;
+  float BuggySpeed = 0;
   int TagID = 0;
 };
 
@@ -122,10 +122,10 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     {"ENA", [](const uint8_t* buf) { Data.enable = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     {"MOD", [](const uint8_t* buf) { Data.mode = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
-    {"DIS", [](const uint8_t* buf) { Data.distance = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
-    {"BSP", [](const uint8_t* buf) { Data.BuggySpeed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    {"DIS", [](const uint8_t* buf) { Data.distance = reinterpret_cast<const DataPacket<int>*>(buf)->value;  }},
+    {"BSP", [](const uint8_t* buf) { Data.BuggySpeed = reinterpret_cast<const DataPacket<float>*>(buf)->value; SendUpdate("QRY", Data.BuggySpeed);}},
     {"TAG", [](const uint8_t* buf) { Data.TagID = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    {"TRV", [](const uint8_t* buf) { Data.travelled = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    {"TRV", [](const uint8_t* buf) { Data.travelled = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
     // {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     // {"KPV", [](const uint8_t* buf) { Data.Kp = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
     // {"KIV", [](const uint8_t* buf) { Data.Ki = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
@@ -137,6 +137,8 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
   auto assignment = it->second;
 
   assignment(buffer);
+
+  SendData();
 }
 
 //* WEBSOCKET EVENT FUNCTION, IT IS USED BY THE SERVER TO HANDLE ANY KIND OF EVENT, IT HAS TO BE REGISTERED IN SETUP AS THE SERVERS CALLBACK FUNCTION
@@ -155,7 +157,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
 
     } else if (message == "changeMode") {
       Data.mode++;
-      if (Data.mode > 2) {
+      if (Data.mode > 1) {
         Data.mode = 0;
       }
 
@@ -171,7 +173,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
 
     } else if (message.indexOf("speedValue") != -1) {
       int separatorIndex = message.indexOf(":");
-      Data.speed = message.substring(separatorIndex + 1).toInt();
+      Data.speed = message.substring(separatorIndex + 1).toFloat();
     }
 
     // EXTRA STUFF FOR REAL TIME PID CONSTANT CONTROL OVER WIFI
@@ -243,7 +245,7 @@ void HTTP() {
     } 
     
     // CSS REQUEST
-    else if (request.indexOf("GET /styles.css") >= 0) {
+    else if (request.indexOf("GET /style.css") >= 0) {
       client.println("HTTP/1.1 200 OK");
       client.println("Content-Type: text/css");
       client.println();

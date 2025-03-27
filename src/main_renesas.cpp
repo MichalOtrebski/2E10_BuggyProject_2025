@@ -46,10 +46,10 @@ struct LocalData{
   bool enable = false;
   int mode = 0;
   bool obstacle = false;
-  double distance = 0;
-  double travelled;
+  int distance = 0;
+  float travelled = 0;
   int speed = 0;
-  int BuggySpeed = 0;
+  float BuggySpeed = 0;
   int TagID = 0;
 };
 
@@ -248,9 +248,12 @@ void loop() {
   now = millis();
   serialPacket.update();
 
+
   checkTimeout();
 
   SpeedAndDistance();
+
+  CheckAndSend();
 
   // ON/OFF
   if (Data.enable) {
@@ -324,7 +327,7 @@ void loop() {
       Data.speed = (int)ReferenceObjectOutput;
     } 
 
-    Serial.println(Data.TagID);
+    // Serial.println(Data.TagID);
 
     switch (BuggyState) {
       case NORMAL:
@@ -348,7 +351,7 @@ void loop() {
     Data.obstacle = false;
   }
 
-  CheckAndSend();
+
 
   if (now - prev >= 100) {
     //printDebug();
@@ -575,21 +578,24 @@ void CheckAndSend() {
 
   if (Data.distance != PrevData.distance) {
     SendUpdate("DIS", Data.distance);
+    // Serial.println(Data.distance);
     changed = true;
   }
 
   if (Data.BuggySpeed != PrevData.BuggySpeed) {
     SendUpdate("BSP", Data.BuggySpeed);
+    Serial.println("speed sent");
     changed = true;
   }
 
-  if (Data.TagID != Data.TagID) {
+  if (Data.TagID != PrevData.TagID) {
     SendUpdate("TAG", Data.TagID);
     changed = true;
   }
 
-  if (Data.travelled != Data.travelled) {
+  if (Data.travelled != PrevData.travelled) {
     SendUpdate("TRV", Data.travelled);
+    Serial.println(Data.travelled);
     changed = true;
   }
 

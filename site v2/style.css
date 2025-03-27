@@ -10,7 +10,7 @@ body {
     color: #e0e0e0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
     .desktop-only {
       display: none;
     }
@@ -35,7 +35,7 @@ body {
   }
   
   /* The slider itself */
-  .slider {
+.slider {
     align-self: center;
     -webkit-appearance: none;  /* Override default CSS styles */
     appearance: none;
@@ -49,12 +49,12 @@ body {
   }
   
   /* Mouse-over effects */
-  .slider:hover {
+.slider:hover {
     opacity: 0.5; /* Fully shown on mouse-over */
   }
   
   /* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
-  .slider::-webkit-slider-thumb {
+.slider::-webkit-slider-thumb {
     -webkit-appearance: none; /* Override default look */
     appearance: none;
     width: 15%; /* Set a specific slider handle width */
@@ -63,7 +63,7 @@ body {
     cursor: pointer; /* Cursor on hover */
   }
   
-  .slider::-moz-range-thumb {
+.slider::-moz-range-thumb {
     width: 15px;
     height: 25px;
     background: #177bff;
@@ -93,7 +93,9 @@ body {
 }
 
 .start {
-    background-color: #00cc66;
+    --default-color: #00cc66;
+    --hover-color: #028a3f;
+    background-color: var(--default-color);
     color: #fff;
     border: none;
     border-radius: 8px;
@@ -104,7 +106,7 @@ body {
 }
 
 .start:hover {
-    background-color: #028a3f;
+    background-color: var(--hover-color);
 }
 
 .changemode {
@@ -249,7 +251,7 @@ input[type="range"]::-webkit-slider-thumb {
     font-size: 24px;
 }
 
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 1200px) {
     .distance-container {
         flex-direction: column;
     }
