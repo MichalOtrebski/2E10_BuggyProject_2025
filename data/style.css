@@ -10,6 +10,17 @@ body {
     color: #e0e0e0;
 }
 
+@keyframes flash {
+    0% { background-color: #121212;}
+    50% { background-color: rgb(226, 76, 76);}
+    100% { background-color: #121212;}
+
+}
+
+.flash-bg {
+    animation: flash 1s infinite;
+}
+
 @media (max-width: 1200px) {
     .desktop-only {
       display: none;
@@ -153,11 +164,6 @@ button {
     opacity: 1;
 }
 
-@keyframes flash {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
-
 /* Speedometer Section */
 .speedometer-section {
     display: flex;
@@ -258,8 +264,24 @@ input[type="range"]::-webkit-slider-thumb {
     font-size: 24px;
 }
 
+.mobile-only {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+}
+
 @media (max-width: 1200px) {
     .right-panel {
         display: none;
     }
+
+    .mobile-only{
+        display: flex;
+    }
+}
+
+.images {
+    src: "";
 }

@@ -8,6 +8,7 @@
 #include <string>         //* String implementation library
 #include <math.h>         //* math library, just used for PI
 #include <vector>         //* Vector Library for Dynamic Arrays
+#include <queue>
 
 #include <HUSKYLENS.h>    //* Huskylens Library for Tag Regonition
 
@@ -51,6 +52,7 @@ struct LocalData{
   int speed = 0;
   float BuggySpeed = 0;
   int TagID = 0;
+  long loop = 0;
 };
 
 // ENCODER DATA STORAGE
@@ -92,6 +94,11 @@ EncoderData rightHall = {0, 0.0, 0.0, 0};
 
 PacketSerial serialPacket;  //* Packet Serial object
 
+std::queue<unsigned long> timeAverage;
+
+int quantity = 10;
+int sum = 0;
+
 //Pulses Per Revolution
 const double PPR = 4.0;
 
@@ -113,7 +120,8 @@ const int message_interval = 50;
 
 // TIMING VARIABLES
 unsigned long now;
-unsigned long prev;
+unsigned long prev = 0;
+unsigned long loopPrev = 0;
 
 //*HC-SR04 Sonar
 NewPing sonar(TRIG, ECHO, 50);
@@ -290,8 +298,6 @@ void loop() {
     scaledTurnSpeed = baseTurningSpeed + Data.speed*(0.3); // scales the turning speed based on the user set speed
     TurningSpeed = constrain(turningOutput, 0, 255);
 
-    // Serial.println(turningOutput);
-
     if (BuggyState == NORMAL) {
 
       if (now - prev_Cam >= 200 && ((millis() - tagTimeout) > 2000)) {
@@ -314,8 +320,7 @@ void loop() {
       CF = 3.64;
 
       Data.speed = constrain(ReferenceSpeedOutput * CF, 60, 255);
-     
-      // Serial.println(ReferenceSpeedOutput);
+    
     } 
 
     // REFERENCE OBJECT MODE
@@ -326,8 +331,6 @@ void loop() {
       ReferenceObjectPID.SetOutputLimits(60, 240); 
       Data.speed = (int)ReferenceObjectOutput;
     } 
-
-    // Serial.println(Data.TagID);
 
     switch (BuggyState) {
       case NORMAL:
@@ -361,9 +364,18 @@ void loop() {
 
   ending = micros();
 
-  // Serial.println(BuggyState);
-  //Serial.println("loop:" + String(ending - starting));
+  timeAverage.push(ending - starting);
+  sum += ending - starting;
 
+  if (timeAverage.size() > quantity) {
+    sum -= timeAverage.front();
+    timeAverage.pop();
+  }
+
+  if (millis() - loopPrev >= 300) {
+    Data.loop = sum / quantity;
+    loopPrev = millis();
+  }
 }
 
 //* EVENT HANDLER FOR PACKETSERIAL
@@ -399,8 +411,6 @@ void SendUpdate(const char command[4], T value) {
 
 //* CHECK IF DISTANCE IS WITHIN LIMITS
 void obstacle() {
-
-  //Serial.println("function obstacle is ran:");
 
   if (now - prev >= message_interval) {
     Data.distance = sonar.ping_cm();
@@ -578,13 +588,11 @@ void CheckAndSend() {
 
   if (Data.distance != PrevData.distance) {
     SendUpdate("DIS", Data.distance);
-    // Serial.println(Data.distance);
     changed = true;
   }
 
   if (Data.BuggySpeed != PrevData.BuggySpeed) {
     SendUpdate("BSP", Data.BuggySpeed);
-    Serial.println("speed sent");
     changed = true;
   }
 
@@ -595,7 +603,11 @@ void CheckAndSend() {
 
   if (Data.travelled != PrevData.travelled) {
     SendUpdate("TRV", Data.travelled);
-    Serial.println(Data.travelled);
+    changed = true;
+  }
+
+  if (Data.loop != PrevData.loop) {
+    SendUpdate("LOP", Data.loop);
     changed = true;
   }
 
@@ -610,13 +622,10 @@ void boot() {
   SendUpdate("MOD", Data.mode);
   SendUpdate("OBS", Data.obstacle);
   SendUpdate("DIS", Data.distance);
+  SendUpdate("SPD", Data.speed);
   SendUpdate("BSP", Data.BuggySpeed);
   SendUpdate("TAG", Data.TagID);
   SendUpdate("TRV", Data.travelled);
-  // SendUpdate("KPV", Data.Kp);
-  // SendUpdate("KIV", Data.Ki);
-  // SendUpdate("KDV", Data.Kd);
-  Serial.println("INITAL SENT");
 }
 
 //* Initialises All Pins to the Correct State
@@ -642,47 +651,6 @@ void PinInitialise() {
   // ATTACHES INTERRUPT AND ISR TO THE ENCODER PINS AND SETS MODE, RISING = TRANSITION FROM LOW -> HIGH
   attachInterrupt(digitalPinToInterrupt(LEFT_HALL), LeftHallISR, RISING);
   attachInterrupt(digitalPinToInterrupt(RIGHT_HALL), RightHallISR, RISING);
-}
-
-//* Prints Some Debug Info over Serial
-void printDebug() {
-
-  Serial.println("------------------");
-
-  // Serial.print("ENABLE: ");
-  // Serial.println(Data.enable);
-
-  // Serial.print("LEFT IR: ");
-  // Serial.println(L_IR_O);
-  // Serial.print("RIGHT IR: ");
-  // Serial.println(R_IR_O);
-
-  // Serial.print("SPEED: ");
-  // Serial.println(String(Data.speed));
-
-  // Serial.print("DISTANCE: ");
-  // Serial.println(Data.distance);
-
-  // Serial.print("MODE: ");
-  // Serial.println(String(Data.mode));
-
-  // Serial.print("OBS: ");
-  // Serial.println(String(Data.obstacle));
-  
-  // Serial.print("input: ");
-  // Serial.println(String(turningInput)); 
-
-  // Serial.print("output: ");
-  // Serial.println(turningOutput);
-
-  // Serial.print("Kp: ");
-  // Serial.println(String(Data.Kp));
-  // Serial.print("Ki: ");
-  // Serial.println(String(Data.Ki));
-  // Serial.print("Kd: ");
-  // Serial.println(String(Data.Kd));
-
-  Serial.println("------------------");
 }
 
 //* INTERUPT SERVICE ROUTINE
@@ -813,4 +781,45 @@ void move() {
       }
     } 
   }
+}
+
+//* Prints Some Debug Info over Serial
+void printDebug() {
+
+  Serial.println("------------------");
+
+  // Serial.print("ENABLE: ");
+  // Serial.println(Data.enable);
+
+  // Serial.print("LEFT IR: ");
+  // Serial.println(L_IR_O);
+  // Serial.print("RIGHT IR: ");
+  // Serial.println(R_IR_O);
+
+  // Serial.print("SPEED: ");
+  // Serial.println(String(Data.speed));
+
+  // Serial.print("DISTANCE: ");
+  // Serial.println(Data.distance);
+
+  // Serial.print("MODE: ");
+  // Serial.println(String(Data.mode));
+
+  // Serial.print("OBS: ");
+  // Serial.println(String(Data.obstacle));
+  
+  // Serial.print("input: ");
+  // Serial.println(String(turningInput)); 
+
+  // Serial.print("output: ");
+  // Serial.println(turningOutput);
+
+  // Serial.print("Kp: ");
+  // Serial.println(String(Data.Kp));
+  // Serial.print("Ki: ");
+  // Serial.println(String(Data.Ki));
+  // Serial.print("Kd: ");
+  // Serial.println(String(Data.Kd));
+
+  Serial.println("------------------");
 }

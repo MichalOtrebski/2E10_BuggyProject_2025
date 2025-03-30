@@ -5,6 +5,7 @@
 #include <WebSocketsServer.h>   //* WebSockets Library for Hosting WebSockets for Asynchronous Communication
 #include <ArduinoJson.h>        //* JSON Library for Creating Json Formatted Variables, For Sending to the Client Over WebSockets
 #include <PacketSerial.h>
+#include <queue>
 
 #include <functional>           //* Tools for Function Objecst, Lambdas and std::funciton Wrappers
 #include <unordered_map>        //* Hash Table-Based Container Library
@@ -43,6 +44,7 @@ struct LocalData{
   int speed = 0;
   float BuggySpeed = 0;
   int TagID = 0;
+  long loop;
 };
 
 //* Packet for Sending Command and value Pairs
@@ -67,6 +69,19 @@ PacketSerial serialPacket;
 
 // Message Interval for executing every X ms
 const uint32_t message_interval = 50;
+
+std::queue<unsigned long> timeAverage; // For the average loop time
+int sum = 0;
+int quantity = 50; // Number of samples to average
+
+unsigned long start;
+unsigned long ending = 0;
+unsigned long loopPrev = 0;
+
+int ESPLoop = 0;
+int prevESPLoop = 0;
+int PeakLoop = 0;
+int prevPeakLoop = 0;
 
 /* #endregion */
 
@@ -105,10 +120,33 @@ void setup() {
 }
 
 void loop() {
+  start = micros(); // Get the current time in milliseconds
+
   serialPacket.update();
   HTTP();  // Sends Initial HTTP Handshake
   wss.loop(); // Processes incoming Events, callback function has to be registered, basically passes the event to the callback function
   CheckAndSend();
+
+  ending = micros(); // Get the current time in milliseconds
+
+  timeAverage.push(ending - start);
+  sum += ending - start;
+
+  if (timeAverage.size() > quantity) {
+    sum -= timeAverage.front();
+    timeAverage.pop();
+    ESPLoop = (ending - start);
+  }
+
+  if (ESPLoop > PeakLoop) {
+    PeakLoop = ESPLoop;
+    }
+
+  static unsigned long lastExecutionTime = 0;
+  if (millis() - lastExecutionTime >= 1000) {
+    lastExecutionTime = millis();
+    PeakLoop = 0;
+  }
 }
 
 //* EVENT HANDLER FOR PACKETSERIAL
@@ -123,10 +161,11 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     {"MOD", [](const uint8_t* buf) { Data.mode = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     {"DIS", [](const uint8_t* buf) { Data.distance = reinterpret_cast<const DataPacket<int>*>(buf)->value;  }},
-    {"BSP", [](const uint8_t* buf) { Data.BuggySpeed = reinterpret_cast<const DataPacket<float>*>(buf)->value; SendUpdate("QRY", Data.BuggySpeed);}},
+    {"BSP", [](const uint8_t* buf) { Data.BuggySpeed = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
     {"TAG", [](const uint8_t* buf) { Data.TagID = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     {"TRV", [](const uint8_t* buf) { Data.travelled = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
-    // {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    {"LOP", [](const uint8_t* buf) { Data.loop = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
+    {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     // {"KPV", [](const uint8_t* buf) { Data.Kp = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
     // {"KIV", [](const uint8_t* buf) { Data.Ki = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
     // {"KDV", [](const uint8_t* buf) { Data.Kd = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
@@ -208,6 +247,9 @@ void SendData() {
   doc["distance"] = Data.distance;
   doc["travelled"] = Data.travelled;
   doc["TagID"] = Data.TagID;
+  doc["renesas"] = Data.loop;
+  doc["esp"] = ESPLoop;
+  doc["peak"] = PeakLoop;
   // doc["Kp"] = Data.Kp;
   // doc["Ki"] = Data.Ki;
   // doc["Kd"] = Data.Kd;
@@ -304,9 +346,15 @@ void CheckAndSend() {
   //   changed = true;
   // }
 
-  // if (Data.BuggySpeed != PrevData.BuggySpeed) {
-  //   changed = true;
-  // }
+  if (ESPLoop != prevESPLoop) {
+    prevESPLoop = ESPLoop;
+    changed = true;
+  }
+
+  if (PeakLoop != prevPeakLoop) {
+    prevPeakLoop = PeakLoop;
+    changed = true;
+  }
 
   if (changed) {
     PrevData = Data;
