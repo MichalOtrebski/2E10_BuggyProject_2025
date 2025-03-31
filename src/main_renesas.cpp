@@ -173,6 +173,8 @@ unsigned long prev_Cam;
 
 unsigned long tagTimeout = 0;
 
+unsigned long prevSpeed = 0;
+
 // left and right wheel speed
 double LeftSpeed;
 double RightSpeed;
@@ -263,7 +265,6 @@ void loop() {
   now = millis();
   serialPacket.update();
 
-
   checkTimeout();
 
   SpeedAndDistance();
@@ -343,7 +344,7 @@ void loop() {
 
       CF = 3.64;
 
-      Data.speed = constrain(ReferenceSpeedOutput * CF, 60, 255);
+      Data.speed = constrain(ReferenceSpeedOutput * CF, 50, 255);
     
     } 
 
@@ -615,7 +616,7 @@ void CheckAndSend() {
   if (Data.BuggySpeed != PrevData.BuggySpeed) {
     SendUpdate("BSP", Data.BuggySpeed);
     changed = true;
-  }
+  }  
 
   if (Data.TagID != PrevData.TagID) {
     SendUpdate("TAG", Data.TagID);
@@ -632,9 +633,9 @@ void CheckAndSend() {
     changed = true;
   }
 
-  if (Data.BuggySpeed == 0) {
-    SendUpdate("BSP", 0.0);
-  }
+  // if (Data.BuggySpeed == 0) {
+  //   SendUpdate("BSP", 0.0);
+  // }
 
   if (changed) {
     PrevData = Data;
@@ -710,12 +711,18 @@ void RightHallISR() {
 void SpeedAndDistance() {
 
   // check for numerator 0, dividing 0 by anything is technically compiler specific, but just in case =
-  if (!(leftHall.speed == 0.0 && rightHall.speed == 0.0)) {
-    Data.BuggySpeed = (leftHall.speed + rightHall.speed) / 2.0; // average speed between the two wheels
-  } else {
-    Data.BuggySpeed = 0.0;
-  }
+  if ((millis() - prevSpeed) > 200) {
+    Serial.println("works");
 
+    if (!(leftHall.speed == 0.0 && rightHall.speed == 0.0)) {
+      Data.BuggySpeed = (leftHall.speed + rightHall.speed) / 2.0; // average speed between the two wheels
+    } else {
+      Data.BuggySpeed = 0.0;
+    }
+
+    prevSpeed = millis();
+  }
+  
   Data.travelled = (leftHall.distance + rightHall.distance) / 2.0; // average distance travelled between the two wheels
 }
 

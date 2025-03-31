@@ -190,7 +190,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
 
     } else if (message == "stop") {
       Data.enable = false;
-      Data.BuggySpeed = 0.0;
+      // Data.BuggySpeed = 0.0;
       
     } else if (message == "changeMode") {
       Data.mode++;

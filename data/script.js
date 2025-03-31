@@ -10,7 +10,10 @@ let travelled = 0;
 let mode = 0;
 let socket;
 let id = 0;
-let obstacleDetected
+let obstacleDetected = false;
+let badspeed = 0;
+
+alpha = 0.5;
 
 let isChangingSpeedSlider = false;
 
@@ -49,20 +52,6 @@ const images = [
 
 var gaugeElement = document.getElementsByTagName('canvas')[0];
 
-// const observer = new MutationObserver((mutations) => {
-//     mutations.forEach(mutation => {
-//       if (mutation.attributeName === 'data-value') {
-//         const newValue = parseFloat(gaugeElement.getAttribute('data-value'));
-//         drawGauge(newValue);
-//       }
-//     });
-//   });
-  
-// Start observing the canvas element for attribute changes
-// observer.observe(canvasElement, { attributes: true });
-
-gaugeElement.setAttribute('data-value', 0);
-
 // Set up WebSocket connection
 function setupWebSocket() {
     socket = new WebSocket("ws://" + window.location.hostname + ":81");
@@ -83,8 +72,10 @@ function setupWebSocket() {
         }
 
         if (data.buggyspeed !== undefined) {
+
+            // badspeed = data.buggyspeed;
+            // buggyspeed = alpha * buggyspeed + (1 - alpha) * badspeed;
             buggyspeed = data.buggyspeed;
-            
             // console.log(data.buggyspeed);
         }
 

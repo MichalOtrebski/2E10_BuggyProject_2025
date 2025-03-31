@@ -48,10 +48,10 @@ const char* html = R"rawliteral(
                 data-color-needle-start="rgba(240, 128, 128, 1)"
                 data-color-needle-end="rgba(255, 160, 122, .9)"
                 data-value-box="true"
-                data-animation-rule="linear"
-                data-animation-duration="50"
+                data-animation-rule="quint"
+                data-animation-duration="200"
                 data-font-value="Led"
-                data-animated-value="false"
+                data-animated-value="true"
             ></canvas>
             <div class="slidecontainer">
                 <input type="range" step="0.1" max="50" value="50" class="slider" id="speedslider">
@@ -390,7 +390,10 @@ let travelled = 0;
 let mode = 0;
 let socket;
 let id = 0;
-let obstacleDetected
+let obstacleDetected = false;
+let badspeed = 0;
+
+alpha = 0.5;
 
 let isChangingSpeedSlider = false;
 
@@ -429,20 +432,6 @@ const images = [
 
 var gaugeElement = document.getElementsByTagName('canvas')[0];
 
-// const observer = new MutationObserver((mutations) => {
-//     mutations.forEach(mutation => {
-//       if (mutation.attributeName === 'data-value') {
-//         const newValue = parseFloat(gaugeElement.getAttribute('data-value'));
-//         drawGauge(newValue);
-//       }
-//     });
-//   });
-  
-// Start observing the canvas element for attribute changes
-// observer.observe(canvasElement, { attributes: true });
-
-gaugeElement.setAttribute('data-value', 0);
-
 // Set up WebSocket connection
 function setupWebSocket() {
     socket = new WebSocket("ws://" + window.location.hostname + ":81");
@@ -463,8 +452,10 @@ function setupWebSocket() {
         }
 
         if (data.buggyspeed !== undefined) {
+
+            // badspeed = data.buggyspeed;
+            // buggyspeed = alpha * buggyspeed + (1 - alpha) * badspeed;
             buggyspeed = data.buggyspeed;
-            
             // console.log(data.buggyspeed);
         }
 
@@ -629,6 +620,7 @@ function updateImage() {
 
 // updateModeText(mode); // might be redundant but havent tested
 setupWebSocket();
+
 
 )rawliteral";
 
