@@ -148,22 +148,6 @@ button {
     transition: background-color 0.3s ease;
 }
 
-/* Hazard Triangle */
-.hazard-triangle {
-    width: 0;
-    height: 0;
-    border-left: 15px solid transparent;
-    border-right: 15px solid transparent;
-    border-bottom: 25px solid red;
-    margin: 20px auto;
-    opacity: 0; /* Hidden by default */
-}
-
-.hazard-triangle.active {
-    animation: flash 1s infinite;
-    opacity: 1;
-}
-
 /* Speedometer Section */
 .speedometer-section {
     display: flex;
