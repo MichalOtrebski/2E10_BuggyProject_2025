@@ -166,9 +166,6 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     {"TRV", [](const uint8_t* buf) { Data.travelled = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
     {"LOP", [](const uint8_t* buf) { Data.loop = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    // {"KPV", [](const uint8_t* buf) { Data.Kp = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
-    // {"KIV", [](const uint8_t* buf) { Data.Ki = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
-    // {"KDV", [](const uint8_t* buf) { Data.Kd = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
     {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
   };
 
@@ -215,19 +212,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
       Data.speed = message.substring(separatorIndex + 1).toFloat();
     }
 
-    // EXTRA STUFF FOR REAL TIME PID CONSTANT CONTROL OVER WIFI
-    // else if (message.indexOf("KpValue") != -1) {
-    //   int separatorIndex = message.indexOf(":");
-    //   Data.Kp = message.substring(separatorIndex + 1).toFloat();
-
-    // } else if (message.indexOf("KiValue") != -1) {
-    //   int separatorIndex = message.indexOf(":");
-    //   Data.Ki = message.substring(separatorIndex + 1).toFloat();
-
-    // } else if (message.indexOf("KdValue") != -1) {
-    //   int separatorIndex = message.indexOf(":");
-    //   Data.Kd = message.substring(separatorIndex + 1).toFloat();
-    // }
   } else if (type == WStype_CONNECTED) {
     SendData();
   }
@@ -250,9 +234,6 @@ void SendData() {
   doc["renesas"] = Data.loop;
   doc["esp"] = ESPLoop;
   doc["peak"] = PeakLoop;
-  // doc["Kp"] = Data.Kp;
-  // doc["Ki"] = Data.Ki;
-  // doc["Kd"] = Data.Kd;
 
   // JSON SERIALISATION, CONVERTING THE DOC TO A SINGLE STRING AND PUTTING IT INTO THE VARIABLE "output"
   String output;
@@ -325,21 +306,6 @@ void CheckAndSend() {
     SendUpdate("SPD", Data.speed);
     changed = true;
   }
-
-  // if (Data.Kp != PrevData.Kp) {
-  //   SendUpdate("KPV", Data.Kp);
-  //   changed = true;
-  // }
-
-  // if (Data.Ki != PrevData.Ki) {
-  //   SendUpdate("KIV", Data.Ki);
-  //   changed = true;
-  // }
-
-  // if (Data.Kd != PrevData.Kd) {
-  //   SendUpdate("KDV", Data.Kd);
-  //   changed = true;
-  // }
 
   // if (Data.distance != PrevData.distance) {
   //   SendUpdate("DIS", Data.distance);

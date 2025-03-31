@@ -305,9 +305,27 @@ void loop() {
         prev_Cam = now;
       }
 
-      if (Data.TagID != 0) {
+      if (Data.TagID == 1 || Data.TagID == 2) {
         BuggyState = WAIT_LINE;
       }
+    }
+
+    if (TagID == 3) {
+      
+      // int apparentWidth = result.width;
+
+      // int distance = (ActualWidth * focal) / apparentWidth;
+
+      // int something = map(distance, 10, 50, 15, ReferenceSpeedSetpoint);
+
+      // Serial.println(something);
+
+
+    } else if (TagID == 4) {
+
+      Data.speed = 30;
+      SendUpdate("SPD", Data.speed);
+      TagID = 0;
     }
 
     // REFERENCE SPEED MODE
@@ -392,9 +410,6 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     // {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     // {"DIS", [](const uint8_t* buf) { Data.distance = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { ReferenceSpeedSetpoint = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    // {"KPV", [](const uint8_t* buf) { Data.Kp = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
-    // {"KIV", [](const uint8_t* buf) { Data.Ki = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
-    // {"KDV", [](const uint8_t* buf) { Data.Kd = reinterpret_cast<const DataPacket<double>*>(buf)->value; }},
     {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
   };
 
