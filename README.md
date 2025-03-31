@@ -29,24 +29,6 @@
 
 Here I'll be explaining all the code that went into the Arduino buggy as well as all the various Libraries, theory and hardware manipulation that had to be done to optimise the computation and execution speed of the buggy.
 
-# Roadmap
- 
-- [x] **BRONZE**
-  - [x] Wiring
-  - [x]  IR Sensors
-  - [x]  US Rangefinder
-  - [x]  WiFi Communication
-
-- [ ] **SILVER**
-  - [ ] PID Control
-  - [ ] Reference Speed Mode
-  - [ ] Reference Object Mode 
-  - [ ] Updated Website
-
-- [ ] **GOLD**
-  - [ ] ???
-
-
 # Build
 
 ### VS Code
