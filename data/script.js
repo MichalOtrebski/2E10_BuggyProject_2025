@@ -49,6 +49,18 @@ const images = [
 
 var gaugeElement = document.getElementsByTagName('canvas')[0];
 
+// const observer = new MutationObserver((mutations) => {
+//     mutations.forEach(mutation => {
+//       if (mutation.attributeName === 'data-value') {
+//         const newValue = parseFloat(gaugeElement.getAttribute('data-value'));
+//         drawGauge(newValue);
+//       }
+//     });
+//   });
+  
+// Start observing the canvas element for attribute changes
+// observer.observe(canvasElement, { attributes: true });
+
 gaugeElement.setAttribute('data-value', 0);
 
 // Set up WebSocket connection
@@ -72,7 +84,7 @@ function setupWebSocket() {
 
         if (data.buggyspeed !== undefined) {
             buggyspeed = data.buggyspeed;
-            gaugeElement.setAttribute('data-value', buggyspeed);
+            
             // console.log(data.buggyspeed);
         }
 
@@ -124,6 +136,7 @@ function setupWebSocket() {
             document.querySelectorAll('.variables p')[2].textContent = `Peak ESP Loop Time: ${data.peak}`;
         }
 
+        gaugeElement.setAttribute('data-value', buggyspeed);
         updateImage();
     };
 
@@ -174,7 +187,6 @@ slider.addEventListener("change", function () {
 function updateObstacleAlert(obstacleDetected) {
     if (obstacleDetected) {
         document.body.classList.add('flash-bg');
-        imageElement.src = images[3];
     } else {
         document.body.classList.remove('flash-bg');
     }

@@ -95,6 +95,11 @@ EncoderData rightHall = {0, 0.0, 0.0, 0};
 PacketSerial serialPacket;  //* Packet Serial object
 
 std::queue<unsigned long> timeAverage;
+std::queue<double> speedAverage;
+
+int speedSampling = 4;
+int speedSum = 0;
+unsigned long speedPrev = 0;
 
 int quantity = 10;
 int sum = 0;
@@ -179,6 +184,8 @@ int TurningSpeed;
 bool set = false;
 
 HUSKYLENS huskylens;
+int TagDistance = 0;
+int CameraConstant = 0;
 
 bool hardStop = true;
 
@@ -310,7 +317,7 @@ void loop() {
       }
     }
 
-    if (TagID == 3) {
+    if (Data.TagID == 3) {
       
       // int apparentWidth = result.width;
 
@@ -320,12 +327,11 @@ void loop() {
 
       // Serial.println(something);
 
-
-    } else if (TagID == 4) {
+    } else if (Data.TagID == 4) {
 
       Data.speed = 30;
       SendUpdate("SPD", Data.speed);
-      TagID = 0;
+      Data.TagID = 0;
     }
 
     // REFERENCE SPEED MODE
@@ -626,6 +632,10 @@ void CheckAndSend() {
     changed = true;
   }
 
+  if (Data.BuggySpeed == 0) {
+    SendUpdate("BSP", 0.0);
+  }
+
   if (changed) {
     PrevData = Data;
   }
@@ -749,6 +759,14 @@ void ReadCamera() {
     }
 
     Data.TagID = max.ID;
+
+
+
+
+
+
+
+
   }
 }
 
