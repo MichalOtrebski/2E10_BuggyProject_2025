@@ -83,6 +83,9 @@ int prevESPLoop = 0;
 int PeakLoop = 0;
 int prevPeakLoop = 0;
 
+int x = 0, y = 0;
+int pastX = 0, pastY = 0;
+
 /* #endregion */
 
 /* #region FUNCTION PROTOTYPES*/
@@ -166,6 +169,8 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     {"TRV", [](const uint8_t* buf) { Data.travelled = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
     {"LOP", [](const uint8_t* buf) { Data.loop = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    {"POX", [](const uint8_t* buf) { x = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    {"POY", [](const uint8_t* buf) { y = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
   };
 
@@ -235,6 +240,8 @@ void SendData() {
   doc["renesas"] = Data.loop;
   doc["esp"] = ESPLoop;
   doc["peak"] = PeakLoop;
+  doc["x"] = x;
+  doc["y"] = y;
 
   // JSON SERIALISATION, CONVERTING THE DOC TO A SINGLE STRING AND PUTTING IT INTO THE VARIABLE "output"
   String output;
@@ -321,6 +328,16 @@ void CheckAndSend() {
   if (PeakLoop != prevPeakLoop) {
     prevPeakLoop = PeakLoop;
     changed = true;
+  }
+
+  if (x != pastX) {
+    changed = true;
+    pastX = x;
+  }
+
+  if (y != pastY) {
+    changed = true;
+    pastY = y;
   }
 
   if (changed) {

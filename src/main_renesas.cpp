@@ -92,6 +92,10 @@ state BuggyState = NORMAL;
 EncoderData leftHall = {0, 0.0, 0.0, 0};
 EncoderData rightHall = {0, 0.0, 0.0, 0};
 
+double leftLast = 0;
+double rightLast = 0;
+unsigned long lastOdometryTime = 0;
+
 PacketSerial serialPacket;  //* Packet Serial object
 
 std::queue<unsigned long> timeAverage;
@@ -190,6 +194,8 @@ int TagDistance = 0;
 int CameraConstant = 0;
 
 bool hardStop = true;
+
+double x = 0, y = 0, theta = 0;
 
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
 PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
@@ -823,6 +829,31 @@ void move() {
   }
 }
 
+void odometry() {
+  if (millis() - lastOdometryTime > 100) {
+    float currentleft = leftHall.distance;
+    float currentright = rightHall.distance;
+
+    float dL = currentleft - leftLast;
+    float dR = currentright - rightLast;
+
+    leftLast = currentleft;
+    rightLast = currentright;
+
+    float d = (dL + dR) / 2.0;
+    float dTheta = (dR - dL) / 13;
+
+    x += d * cos(theta + dTheta / 2.0);
+    y += d * sin(theta + dTheta / 2.0);
+    theta += dTheta;
+
+    SendUpdate("POX", x);
+    SendUpdate("POY", y);
+
+    lastOdometryTime = millis();
+  }
+}
+
 //* Prints Some Debug Info over Serial
 void printDebug() {
 
@@ -863,3 +894,4 @@ void printDebug() {
 
   Serial.println("------------------");
 }
+

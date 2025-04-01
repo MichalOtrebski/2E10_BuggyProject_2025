@@ -87,7 +87,7 @@ const char* html = R"rawliteral(
         <img src="" class="images">
       </div>
       <div class="bottom-right">
-        <p>...</p>
+        <canvas id="odometry" width="750" height="400" style="border:2px solid #444;"></canvas>
       </div>
     </div>
   </div>
@@ -337,10 +337,9 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .bottom-right {
-    /* flex: 1; */
+    flex: 1;
     display: flex;
-    justify-content: center;
-    align-items: center;
+
 }
 
 .top-right {
@@ -374,6 +373,16 @@ input[type="range"]::-webkit-slider-thumb {
     src: "";
 }
 
+canvas {
+    padding: 0;
+    margin: auto;
+    display: block;
+    width: 750px;
+    height: 400px;;
+    /* justify-content: center;
+    align-items: center; */
+}
+
 )rawliteral";
 
 const char* js = R"rawliteral(
@@ -393,7 +402,13 @@ let id = 0;
 let obstacleDetected = false;
 let badspeed = 0;
 
-alpha = 0.5;
+let minX = Infinity;
+let maxX = -Infinity
+let minY = Infinity;
+let maxY = -Infinity;
+
+const alpha = 0.5;
+const padding = 20;
 
 let isChangingSpeedSlider = false;
 
@@ -410,6 +425,8 @@ const slider = document.getElementById("speedslider");
 const output = document.getElementById("speedSet");
 
 const imageElements = document.querySelectorAll('.images');
+
+const trackPoints = [];
 
 /* #region Images */
 
@@ -431,6 +448,8 @@ const images = [
 //////////////////////////////////
 
 var gaugeElement = document.getElementsByTagName('canvas')[0];
+const canvas = document.getElementById('odometry');
+const ctx = canvas.getContext('2d');
 
 // Set up WebSocket connection
 function setupWebSocket() {
@@ -505,6 +524,11 @@ function setupWebSocket() {
         if (data.peak !== undefined) {
             console.log("Peak:", data.peak);
             document.querySelectorAll('.variables p')[2].textContent = `Peak ESP Loop Time: ${data.peak}`;
+        }
+
+        if (data.x !== undefined && data.y !== undefined) {
+            console.log("X:", x, "Y:", y);
+            addPoint(data.x, data.y);
         }
 
         gaugeElement.setAttribute('data-value', buggyspeed);
@@ -618,9 +642,57 @@ function updateImage() {
     }
 }
 
+function addPoint(x, y) {
+    trackPoints.push({ x: x, y: y });
+
+    trackPoints.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      });
+
+    drawPath();
+}
+
+function drawPath() {
+    // Clear the canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Check if we have any points
+    if (trackPoints.length === 0) return;
+
+    const effectiveWidth = canvas.width - 2 * padding;
+    const effectiveHeight = canvas.height - 2 * padding;
+
+    const scaleX = effectiveWidth / (maxX - minX);
+    const scaleY = effectiveHeight / (maxY - minY);
+    
+    const scale = Math.min(scaleX, scaleY);
+    
+    const translateX = padding - (minX * scale);
+    const translateY = padding - (minY * scale);
+
+    ctx.save();
+
+    ctx.translate(translateX, translateY);
+    ctx.scale(scale, scale);
+    
+    // Draw the path
+    ctx.beginPath();
+    ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
+    trackPoints.forEach(point => {
+      ctx.lineTo(point.x, point.y);
+    });
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 3 / scale;
+    ctx.stroke();
+
+    ctx.restore();
+}
+
 // updateModeText(mode); // might be redundant but havent tested
 setupWebSocket();
-
 
 )rawliteral";
 

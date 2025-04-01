@@ -233,10 +233,9 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .bottom-right {
-    /* flex: 1; */
+    flex: 1;
     display: flex;
-    justify-content: center;
-    align-items: center;
+
 }
 
 .top-right {
@@ -268,4 +267,14 @@ input[type="range"]::-webkit-slider-thumb {
 
 .images {
     src: "";
+}
+
+canvas {
+    padding: 0;
+    margin: auto;
+    display: block;
+    width: 750px;
+    height: 400px;;
+    /* justify-content: center;
+    align-items: center; */
 }
