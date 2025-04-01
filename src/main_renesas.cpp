@@ -8,7 +8,7 @@
 #include <string>         //* String implementation library
 #include <math.h>         //* math library, just used for PI
 #include <vector>         //* Vector Library for Dynamic Arrays
-#include <queue>
+#include <queue>          //* Queue Library for FIFO behaviour
 
 #include <HUSKYLENS.h>    //* Huskylens Library for Tag Regonition
 
@@ -63,6 +63,7 @@ struct EncoderData {
   volatile unsigned long last;
 };
 
+// BUGGY STATE BASED ON DETECTED TAG AND RESPONSE TO THAT TAG
 enum state {
   NORMAL,
   WAIT_LINE,
@@ -95,11 +96,6 @@ EncoderData rightHall = {0, 0.0, 0.0, 0};
 PacketSerial serialPacket;  //* Packet Serial object
 
 std::queue<unsigned long> timeAverage;
-std::queue<double> speedAverage;
-
-int speedSampling = 4;
-int speedSum = 0;
-unsigned long speedPrev = 0;
 
 int quantity = 10;
 int sum = 0;
@@ -183,13 +179,20 @@ int baseTurningSpeed = 110; // base speed for turning
 int scaledTurnSpeed; // scaled speed based on user input
 int TurningSpeed;
 
+bool once = true;
+
 bool set = false;
 
 HUSKYLENS huskylens;
+HUSKYLENSResult result;
 int TagDistance = 0;
-int CameraConstant = 0;
+int CameraConstant = (50 * 32) / 5;
+double decel = 0;
+int ActualWidth = 5;
 
 bool hardStop = true;
+
+unsigned long decelPrev;
 
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
 PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
@@ -225,6 +228,7 @@ void checkTimeout();
 
 void ReadCamera();
 void area();
+double deceleration(double);
 
 void boot();
 void PinInitialise();
@@ -306,8 +310,7 @@ void loop() {
     scaledTurnSpeed = baseTurningSpeed + Data.speed*(0.3); // scales the turning speed based on the user set speed
     TurningSpeed = constrain(turningOutput, 0, 255);
 
-    if (BuggyState == NORMAL) {
-
+    if (BuggyState == NORMAL && Data.TagID != 3) {
       if (now - prev_Cam >= 200 && ((millis() - tagTimeout) > 2000)) {
         ReadCamera();
         prev_Cam = now;
@@ -319,17 +322,25 @@ void loop() {
     }
 
     if (Data.TagID == 3) {
-      
-      // int apparentWidth = result.width;
+      if (once) {
+        int apparentWidth = result.width;
+        int distance = (ActualWidth * CameraConstant) / apparentWidth;
+        // Serial.println(distance);
+        decel = deceleration(distance);
+        once = false;
+        decelPrev = millis();
+      }
+      // Serial.println(decel);
 
-      // int distance = (ActualWidth * focal) / apparentWidth;
-
-      // int something = map(distance, 10, 50, 15, ReferenceSpeedSetpoint);
-
-      // Serial.println(something);
+      if (ReferenceSpeedSetpoint + decel > 15) {
+        ReferenceSpeedSetpoint -= decel * millis() - decelPrev;
+        decelPrev = millis();
+      }else {
+        ReferenceSpeedSetpoint = 15;
+        Data.TagID = 0;
+      }
 
     } else if (Data.TagID == 4) {
-
       Data.speed = 30;
       SendUpdate("SPD", Data.speed);
       Data.TagID = 0;
@@ -337,7 +348,6 @@ void loop() {
 
     // REFERENCE SPEED MODE
     if (Data.mode == 0) {
-
       ReferenceSpeedInput = Data.BuggySpeed;
       ReferenceSpeedPID.Compute();
       ReferenceSpeedPID.SetOutputLimits(15, 70); 
@@ -345,17 +355,15 @@ void loop() {
       CF = 3.64;
 
       Data.speed = constrain(ReferenceSpeedOutput * CF, 50, 255);
-    
     } 
 
     // REFERENCE OBJECT MODE
     else if (Data.mode == 1) {
-      
       ReferenceObjectInput = Data.distance;
       ReferenceObjectPID.Compute();
       ReferenceObjectPID.SetOutputLimits(60, 240); 
       Data.speed = (int)ReferenceObjectOutput;
-    } 
+    }
 
     switch (BuggyState) {
       case NORMAL:
@@ -379,13 +387,10 @@ void loop() {
     Data.obstacle = false;
   }
 
-
-
   if (now - prev >= 100) {
     //printDebug();
     prev = now;
   }
-
 
   ending = micros();
 
@@ -501,13 +506,13 @@ void sharpLeft() {
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
-  analogWrite(R_MOT, scaledTurnSpeed + TurningSpeed);
+  analogWrite(R_MOT, constrain(scaledTurnSpeed + TurningSpeed + 60, 0, 255));
 
-  // digitalWrite(LEFT1, HIGH);
-  // digitalWrite(LEFT2, LOW);
-  // analogWrite(L_MOT, 40);
+  digitalWrite(LEFT1, HIGH);
+  digitalWrite(LEFT2, LOW);
+  analogWrite(L_MOT, 20);
 
-  // delayMicroseconds(10);
+  delayMicroseconds(10);
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, LOW);
@@ -518,13 +523,13 @@ void sharpRight() {
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
-  analogWrite(L_MOT, scaledTurnSpeed + TurningSpeed);
+  analogWrite(L_MOT,  constrain(scaledTurnSpeed + TurningSpeed + 60, 0, 255));
 
-  // digitalWrite(RIGHT1, HIGH);
-  // digitalWrite(RIGHT2, LOW);
-  // analogWrite(R_MOT, 50);
+  digitalWrite(RIGHT1, HIGH);
+  digitalWrite(RIGHT2, LOW);
+  analogWrite(R_MOT, 20);
 
-  // delayMicroseconds(10);
+  delayMicroseconds(10);
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, LOW);
@@ -620,6 +625,7 @@ void CheckAndSend() {
 
   if (Data.TagID != PrevData.TagID) {
     SendUpdate("TAG", Data.TagID);
+    Serial.println(Data.TagID);
     changed = true;
   }
 
@@ -710,10 +716,8 @@ void RightHallISR() {
 
 void SpeedAndDistance() {
 
-  // check for numerator 0, dividing 0 by anything is technically compiler specific, but just in case =
   if ((millis() - prevSpeed) > 200) {
-    Serial.println("works");
-
+    // check for numerator 0, dividing 0 by anything is technically compiler specific, but just in case =
     if (!(leftHall.speed == 0.0 && rightHall.speed == 0.0)) {
       Data.BuggySpeed = (leftHall.speed + rightHall.speed) / 2.0; // average speed between the two wheels
     } else {
@@ -765,15 +769,10 @@ void ReadCamera() {
       }
     }
 
+    result = max;
     Data.TagID = max.ID;
 
-
-
-
-
-
-
-
+    once = true;
   }
 }
 
@@ -816,11 +815,17 @@ void move() {
     // stop();
     } else if (BuggyState == WAIT_LINE) {
       if (!L_IR_O && !R_IR_O ) {
-        // stop();
        BuggyState = TURNING;
       }
     } 
   }
+}
+
+double deceleration(double d) { 
+
+  double a = (((pow(Data.BuggySpeed, 2)) + pow(15, 2)) / 2*d);
+
+  return a;
 }
 
 //* Prints Some Debug Info over Serial
