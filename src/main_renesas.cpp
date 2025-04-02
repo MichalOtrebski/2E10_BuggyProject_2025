@@ -70,6 +70,11 @@ enum state {
   TURNING
 };
 
+struct __attribute__((packed)) Position {
+  float x;
+  float y;
+};
+
 //* Packet for Sending Command and value Pairs
 template<typename T>
 struct __attribute__((packed)) DataPacket {
@@ -407,13 +412,10 @@ void loop() {
     Data.obstacle = false;
   }
 
-
-
   if (now - prev >= 100) {
     //printDebug();
     prev = now;
   }
-
 
   ending = micros();
 
@@ -445,8 +447,10 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     // {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     // {"DIS", [](const uint8_t* buf) { Data.distance = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { ReferenceSpeedSetpoint = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    {"QRY", [](const uint8_t* buf) { Serial.println("qry"); }}
+    {"QRY", [](const uint8_t* buf) { Serial.println(reinterpret_cast<const DataPacket<float>*>(buf)->value); }}
   };
+
+
 
   auto it = commandMap.find(command);
   it->second(buffer);
@@ -740,7 +744,6 @@ void SpeedAndDistance() {
 
   // check for numerator 0, dividing 0 by anything is technically compiler specific, but just in case =
   if ((millis() - prevSpeed) > 200) {
-    Serial.println("works");
 
     if (!(leftHall.speed == 0.0 && rightHall.speed == 0.0)) {
       Data.BuggySpeed = (leftHall.speed + rightHall.speed) / 2.0; // average speed between the two wheels
@@ -847,7 +850,7 @@ void move() {
 }
 
 void odometry() {
-  if (millis() - lastOdometryTime > 100) {
+  if (millis() - lastOdometryTime > 50) {
     float currentleft = leftHall.distance * 100;
     float currentright = rightHall.distance * 100;
 
@@ -864,15 +867,14 @@ void odometry() {
     y += d * sin(theta + dTheta / 2.0);
     theta += dTheta;
 
-    if (x != pastX) {
-      SendUpdate("POX", x);
+    if (x != pastX || y != pastY) {
+      Position pos = { x, y };
+      SendUpdate("POS", pos);
+      pastX = x;
+      pastY = y;
     }
 
-    if (y != pastY) {
-      SendUpdate("POY", y);
-    }
-
-    Serial.println(String(x) + ", " + String(y));
+    // Serial.println(String(x) + ", " + String(y));
 
     lastOdometryTime = millis();
   }

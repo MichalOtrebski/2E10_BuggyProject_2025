@@ -49,13 +49,18 @@ struct LocalData{
 
 //* Packet for Sending Command and value Pairs
 template<typename T>
-struct DataPacket {
+struct __attribute__((packed)) DataPacket {
   char command[4];
   T value;
 
   DataPacket(const char cmd[4], T val) : value(val) {
     memcpy(command, cmd, 4);  // Copy the command into the structure
   }
+};
+
+struct __attribute__((packed)) Position {
+  float x;
+  float y;
 };
 
 /* #endregion*/
@@ -80,6 +85,7 @@ unsigned long loopPrev = 0;
 
 int ESPLoop = 0;
 int prevESPLoop = 0;
+unsigned long prevLoop = 0;
 int PeakLoop = 0;
 int prevPeakLoop = 0;
 
@@ -132,18 +138,17 @@ void loop() {
 
   ending = micros(); // Get the current time in milliseconds
 
-  timeAverage.push(ending - start);
-  sum += ending - start;
 
-  if (timeAverage.size() > quantity) {
-    sum -= timeAverage.front();
-    timeAverage.pop();
-    ESPLoop = (ending - start);
-  }
-
-  if (ESPLoop > PeakLoop) {
-    PeakLoop = ESPLoop;
+  if ((ending - start) > 2000) {
+    if (millis() - prevLoop > 50) {
+      ESPLoop = (ending - start);
+      prevLoop = millis();
     }
+  }
+ 
+  if ((ending - start) > PeakLoop) {
+    PeakLoop = (ending - start);
+  }
   
   static unsigned long lastExecutionTime = 0;
   if (millis() - lastExecutionTime >= 1000) {
@@ -168,8 +173,11 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     {"TRV", [](const uint8_t* buf) { Data.travelled = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
     {"LOP", [](const uint8_t* buf) { Data.loop = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    {"POX", [](const uint8_t* buf) { x = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
-    {"POY", [](const uint8_t* buf) { y = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
+    {"POS", [](const uint8_t* buf) { 
+      Position pair = reinterpret_cast<const DataPacket<Position>*>(buf)->value; 
+      x = pair.x;
+      y = pair.y;
+      SendUpdate("QRY", x); }}, // Extract the pair from the packet
     {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
   };
 
@@ -178,9 +186,7 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
 
   assignment(buffer);
 
-  if (command != "POX") {
-    SendData();
-  }
+  SendData();
 }
 
 //* WEBSOCKET EVENT FUNCTION, IT IS USED BY THE SERVER TO HANDLE ANY KIND OF EVENT, IT HAS TO BE REGISTERED IN SETUP AS THE SERVERS CALLBACK FUNCTION
@@ -222,7 +228,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
   } else if (type == WStype_CONNECTED) {
     SendData();
   }
-  // SendData();
+  SendData();
 }
 
 //* BROADCASTS VARIABLE VALUES TO ALL CLIENTS ON THE SERVER TO UPDATE THE CLIENTS UI
@@ -241,8 +247,9 @@ void SendData() {
   doc["renesas"] = Data.loop;
   doc["esp"] = ESPLoop;
   doc["peak"] = PeakLoop;
-  doc["x"] = x;
-  doc["y"] = y;
+  JsonObject position = doc.createNestedObject("position");
+  position["x"] = x;
+  position["y"] = y;
 
   // JSON SERIALISATION, CONVERTING THE DOC TO A SINGLE STRING AND PUTTING IT INTO THE VARIABLE "output"
   String output;
@@ -315,11 +322,6 @@ void CheckAndSend() {
     SendUpdate("SPD", Data.speed);
     changed = true;
   }
-
-  // if (Data.distance != PrevData.distance) {
-  //   SendUpdate("DIS", Data.distance);
-  //   changed = true;
-  // }
 
   if (ESPLoop != prevESPLoop) {
     prevESPLoop = ESPLoop;

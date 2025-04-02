@@ -492,7 +492,7 @@ function setupWebSocket() {
 
         if (data.TagID !== undefined) {
             id = data.TagID;
-            console.log("Tag ID:", id);
+            // console.log("Tag ID:", id);
             document.querySelectorAll('.variables p')[3].textContent = `Tag ID: ${id}`;
         }
 
@@ -515,27 +515,25 @@ function setupWebSocket() {
         }
 
         if (data.renesas !== undefined) {
-            console.log("Renesas Loop Time:", data.renesas);
+            // console.log("Renesas Loop Time:", data.renesas);
             document.querySelectorAll('.variables p')[0].textContent = `Renesas Loop Time: ${data.renesas}`;
         }
 
         if (data.esp !== undefined) {
-            console.log("ESP32 Loop Time:", data.esp);
+            // console.log("ESP32 Loop Time:", data.esp);
             document.querySelectorAll('.variables p')[1].textContent = `ESP32 Loop Time: ${data.esp}`;
         }
 
         if (data.peak !== undefined) {
-            console.log("Peak:", data.peak);
+            // console.log("Peak:", data.peak);
             document.querySelectorAll('.variables p')[2].textContent = `Peak ESP Loop Time: ${data.peak}`;
         }
 
-        if (data.x !== undefined) {
-            x = data.x; 
-        }
-
-        if (data.y !== undefined) {
-            y = data.y;
+        if (data.position && data.position.x !== undefined && data.position.y !== undefined) {
+            x = data.position.x;
+            y = data.position.y;
             addPoint(x, -y);
+            console.log("Position:", x, y);
         }
 
         gaugeElement.setAttribute('data-value', buggyspeed);
@@ -564,7 +562,6 @@ startStopBtn.addEventListener('click', () => {
     } else {
         socket.send("start");
     }
-
 });
 
 // listen to clicks on change mode
