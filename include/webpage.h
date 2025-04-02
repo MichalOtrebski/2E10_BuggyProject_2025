@@ -87,7 +87,7 @@ const char* html = R"rawliteral(
         <img src="" class="images">
       </div>
       <div class="bottom-right">
-        <canvas id="odometry" width="750" height="400" style="border:2px solid #444;"></canvas>
+        <canvas class="canvas-container" id="odometry" width="750" height="400" style="border:2px solid #444;"></canvas>
       </div>
     </div>
   </div>
@@ -373,7 +373,7 @@ input[type="range"]::-webkit-slider-thumb {
     src: "";
 }
 
-canvas {
+.canvas-container {
     padding: 0;
     margin: auto;
     display: block;
@@ -406,6 +406,9 @@ let minX = Infinity;
 let maxX = -Infinity
 let minY = Infinity;
 let maxY = -Infinity;
+
+let x = 0;
+let y = 0;
 
 const alpha = 0.5;
 const padding = 20;
@@ -526,9 +529,13 @@ function setupWebSocket() {
             document.querySelectorAll('.variables p')[2].textContent = `Peak ESP Loop Time: ${data.peak}`;
         }
 
-        if (data.x !== undefined && data.y !== undefined) {
-            console.log("X:", x, "Y:", y);
-            addPoint(data.x, data.y);
+        if (data.x !== undefined) {
+            x = data.x; 
+        }
+
+        if (data.y !== undefined) {
+            y = data.y;
+            addPoint(x, -y);
         }
 
         gaugeElement.setAttribute('data-value', buggyspeed);
@@ -611,7 +618,7 @@ function updateModeText(mode) {
             modeText = "Reference Object";
             break;
         default:
-            modeText = "Unknown Mode";
+            modeText = "Unknown Mode"   ;
             break;
     }
     modeSelect.textContent = `${modeText}`;

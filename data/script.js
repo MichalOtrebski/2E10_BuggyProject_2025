@@ -18,6 +18,9 @@ let maxX = -Infinity
 let minY = Infinity;
 let maxY = -Infinity;
 
+let x = 0;
+let y = 0;
+
 const alpha = 0.5;
 const padding = 20;
 
@@ -137,9 +140,10 @@ function setupWebSocket() {
             document.querySelectorAll('.variables p')[2].textContent = `Peak ESP Loop Time: ${data.peak}`;
         }
 
-        if (data.x !== undefined && data.y !== undefined) {
-            console.log("X:", x, "Y:", y);
-            addPoint(data.x, data.y);
+        if (data.y !== undefined && data.x !== undefined) {
+            x = data.x;
+            y = data.y;
+            addPoint(x, -y);
         }
 
         gaugeElement.setAttribute('data-value', buggyspeed);
@@ -168,7 +172,6 @@ startStopBtn.addEventListener('click', () => {
     } else {
         socket.send("start");
     }
-
 });
 
 // listen to clicks on change mode
@@ -222,7 +225,7 @@ function updateModeText(mode) {
             modeText = "Reference Object";
             break;
         default:
-            modeText = "Unknown Mode";
+            modeText = "Unknown Mode"   ;
             break;
     }
     modeSelect.textContent = `${modeText}`;

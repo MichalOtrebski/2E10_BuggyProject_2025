@@ -83,8 +83,8 @@ int prevESPLoop = 0;
 int PeakLoop = 0;
 int prevPeakLoop = 0;
 
-int x = 0, y = 0;
-int pastX = 0, pastY = 0;
+float x = 0, y = 0;
+float pastX = 0, pastY = 0;
 
 /* #endregion */
 
@@ -144,7 +144,7 @@ void loop() {
   if (ESPLoop > PeakLoop) {
     PeakLoop = ESPLoop;
     }
-
+  
   static unsigned long lastExecutionTime = 0;
   if (millis() - lastExecutionTime >= 1000) {
     lastExecutionTime = millis();
@@ -159,7 +159,6 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
   memcpy(command, buffer, 4);
 
   static const std::unordered_map<std::string, std::function<void(const uint8_t*)>> commandMap = {
-
     {"ENA", [](const uint8_t* buf) { Data.enable = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     {"MOD", [](const uint8_t* buf) { Data.mode = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
@@ -169,8 +168,8 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     {"TRV", [](const uint8_t* buf) { Data.travelled = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
     {"LOP", [](const uint8_t* buf) { Data.loop = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    {"POX", [](const uint8_t* buf) { x = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    {"POY", [](const uint8_t* buf) { y = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    {"POX", [](const uint8_t* buf) { x = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
+    {"POY", [](const uint8_t* buf) { y = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
     {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
   };
 
@@ -179,7 +178,9 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
 
   assignment(buffer);
 
-  SendData();
+  if (command != "POX") {
+    SendData();
+  }
 }
 
 //* WEBSOCKET EVENT FUNCTION, IT IS USED BY THE SERVER TO HANDLE ANY KIND OF EVENT, IT HAS TO BE REGISTERED IN SETUP AS THE SERVERS CALLBACK FUNCTION
@@ -221,7 +222,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
   } else if (type == WStype_CONNECTED) {
     SendData();
   }
-  SendData();
+  // SendData();
 }
 
 //* BROADCASTS VARIABLE VALUES TO ALL CLIENTS ON THE SERVER TO UPDATE THE CLIENTS UI
@@ -330,14 +331,10 @@ void CheckAndSend() {
     changed = true;
   }
 
-  if (x != pastX) {
-    changed = true;
+  if (x != pastX || y != pastY) {
     pastX = x;
-  }
-
-  if (y != pastY) {
-    changed = true;
     pastY = y;
+    changed = true;
   }
 
   if (changed) {

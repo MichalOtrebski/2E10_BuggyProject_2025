@@ -203,7 +203,8 @@ bool hardStop = true;
 
 unsigned long decelPrev;
 
-double x = 0, y = 0, theta = 0;
+float x = 0, y = 0, theta = 0;
+float pastX = 0, pastY = 0;
 
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
 PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
@@ -240,6 +241,8 @@ void checkTimeout();
 void ReadCamera();
 void area();
 double deceleration(double);
+
+void odometry();
 
 void boot();
 void PinInitialise();
@@ -283,6 +286,8 @@ void loop() {
   checkTimeout();
 
   SpeedAndDistance();
+
+  odometry();
 
   CheckAndSend();
 
@@ -440,7 +445,7 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     // {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     // {"DIS", [](const uint8_t* buf) { Data.distance = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { ReferenceSpeedSetpoint = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
+    {"QRY", [](const uint8_t* buf) { Serial.println("qry"); }}
   };
 
   auto it = commandMap.find(command);
@@ -843,8 +848,8 @@ void move() {
 
 void odometry() {
   if (millis() - lastOdometryTime > 100) {
-    float currentleft = leftHall.distance;
-    float currentright = rightHall.distance;
+    float currentleft = leftHall.distance * 100;
+    float currentright = rightHall.distance * 100;
 
     float dL = currentleft - leftLast;
     float dR = currentright - rightLast;
@@ -859,8 +864,15 @@ void odometry() {
     y += d * sin(theta + dTheta / 2.0);
     theta += dTheta;
 
-    SendUpdate("POX", x);
-    SendUpdate("POY", y);
+    if (x != pastX) {
+      SendUpdate("POX", x);
+    }
+
+    if (y != pastY) {
+      SendUpdate("POY", y);
+    }
+
+    Serial.println(String(x) + ", " + String(y));
 
     lastOdometryTime = millis();
   }
