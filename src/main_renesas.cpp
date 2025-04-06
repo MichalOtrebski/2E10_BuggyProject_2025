@@ -100,7 +100,6 @@ unsigned long lastOdometryTime = 0;
 PacketSerial serialPacket;  //* Packet Serial object
 
 std::queue<unsigned long> timeAverage;
-
 int speedSampling = 4;
 int speedSum = 0;
 unsigned long speedPrev = 0;
@@ -333,7 +332,6 @@ void loop() {
     TurningSpeed = constrain(turningOutput, 0, 255);
 
     if (BuggyState == NORMAL && Data.TagID != 3) {
-
       if (now - prev_Cam >= 200 && ((millis() - tagTimeout) > 2000)) {
         ReadCamera();
         prev_Cam = now;
@@ -374,12 +372,12 @@ void loop() {
 
     } else if (Data.TagID == 4) {
       ReferenceSpeedSetpoint = 35;
+
       Data.TagID = 0;
     }
 
     // REFERENCE SPEED MODE
     if (Data.mode == 0) {
-
       ReferenceSpeedInput = Data.BuggySpeed;
       ReferenceSpeedPID.Compute();
       ReferenceSpeedPID.SetOutputLimits(15, 70); 
@@ -387,17 +385,15 @@ void loop() {
       CF = 3.64;
 
       Data.speed = constrain(ReferenceSpeedOutput * CF, 50, 255);
-    
     } 
 
     // REFERENCE OBJECT MODE
     else if (Data.mode == 1) {
-      
       ReferenceObjectInput = Data.distance;
       ReferenceObjectPID.Compute();
       ReferenceObjectPID.SetOutputLimits(60, 240); 
       Data.speed = (int)ReferenceObjectOutput;
-    } 
+    }
 
     // IF MODE IS OUT OF RANGE
     else {
@@ -552,6 +548,7 @@ void sharpRight() {
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, HIGH);
+
   analogWrite(L_MOT, constrain(scaledTurnSpeed + TurningSpeed + 60, 0, 255));
 
   digitalWrite(RIGHT1, HIGH);
@@ -654,6 +651,7 @@ void CheckAndSend() {
 
   if (Data.TagID != PrevData.TagID) {
     SendUpdate("TAG", Data.TagID);
+    Serial.println(Data.TagID);
     changed = true;
   }
 
@@ -845,7 +843,6 @@ void move() {
     // stop();
     } else if (BuggyState == WAIT_LINE) {
       if (!L_IR_O && !R_IR_O ) {
-        // stop();
        BuggyState = TURNING;
       }
     } 
