@@ -417,6 +417,8 @@ void loop() {
     prev = now;
   }
 
+  Serial.println(Data.BuggySpeed);
+
   ending = micros();
 
   timeAverage.push(ending - starting);

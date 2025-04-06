@@ -2,7 +2,6 @@
 #define WEBPAGE_H
 
 const char* html = R"rawliteral(
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,7 +23,7 @@ const char* html = R"rawliteral(
           <img src="" class="images">
         </div>
         <div class="speedometer-section">
-            <canvas data-type="radial-gauge"
+            <canvas id="meter" data-type="radial-gauge"
                 data-width="300"
                 data-height="300"
                 data-units="cm/s"
@@ -450,7 +449,7 @@ const images = [
 
 //////////////////////////////////
 
-var gaugeElement = document.getElementsByTagName('canvas')[0];
+var gaugeElement = document.getElementById('meter');
 const canvas = document.getElementById('odometry');
 const ctx = canvas.getContext('2d');
 
@@ -461,6 +460,8 @@ function setupWebSocket() {
     // console logging
     socket.onopen = () => {
         console.log("Connected to WebSocket server.");
+        // requestAnimationFrame(updateUI);
+        setTimeout(updateUI, 100);
     };
 
     // Incoming WebSocket messages
@@ -478,7 +479,8 @@ function setupWebSocket() {
             // badspeed = data.buggyspeed;
             // buggyspeed = alpha * buggyspeed + (1 - alpha) * badspeed;
             buggyspeed = data.buggyspeed;
-            // console.log(data.buggyspeed);
+            gaugeElement.setAttribute('data-value', buggyspeed);
+            console.log(data.buggyspeed);
         }
 
         if (data.distance !== undefined) {
@@ -535,9 +537,6 @@ function setupWebSocket() {
             addPoint(x, -y);
             console.log("Position:", x, y);
         }
-
-        gaugeElement.setAttribute('data-value', buggyspeed);
-        updateImage();
     };
 
     // Handle WebSocket close
@@ -693,6 +692,12 @@ function drawPath() {
     ctx.stroke();
 
     ctx.restore();
+}
+
+function updateUI() {
+    gaugeElement.setAttribute('data-value', buggyspeed);
+    console.log("drawing");
+    updateImage();
 }
 
 // updateModeText(mode); // might be redundant but havent tested
