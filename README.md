@@ -2,7 +2,6 @@
   <summary>Table of Contents</summary>
   <ol>
     <li><a href="#about">About</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#build">Build</a></li>
     <li><a href="#libraries">Libraries</a></li>
     <li><a href="#theory">Theory</a>
