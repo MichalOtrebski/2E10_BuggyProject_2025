@@ -40,7 +40,7 @@ const output = document.getElementById("speedSet");
 
 const imageElements = document.querySelectorAll('.images');
 
-const trackPoints = [];
+let trackPoints = [];
 
 /* #region Images */
 
@@ -61,7 +61,56 @@ const images = [
 
 //////////////////////////////////
 
-var gaugeElement = document.getElementById('meter');
+var gauge = new RadialGauge({
+    renderTo: 'meter',
+    width: 300,
+    height: 300,
+    title: "Speed",
+    units: "cm/s",
+    minValue: 0,
+    maxValue: 50,
+    majorTicks: [
+        "0",
+        "10",
+        "20",
+        "30",
+        "40",
+        "50"
+    ],
+    minorTicks: 4,
+    strokeTicks: true,
+    highlights: [
+        {
+            "from": 0,
+            "to": 35,
+            "color": "rgba(0, 70, 20, 140)"
+        },
+        {
+            "from": 35,
+            "to": 50,
+            "color": "rgba(150, 0, 0, 140)"
+        }
+    ],
+    colorPlate: "#222",
+    colorMajorTicks: "#f5f5f5",
+    colorMinorTicks: "#ddd",
+    colorTitle: "#fff",
+    colorUnits: "#ccc",
+    colorNumbers: "#eee",
+    colorNeedleStart: "rgba(240, 128, 128, 1)",
+    colorNeedleEnd: "rgba(240, 128, 128, 1)",
+    borderShadowWidth: 0,
+    borders: false,
+    needleType: "arrow",
+    needleWidth: 2,
+    needleCircleSize: 7,
+    needleCircleOuter: true,
+    needleCircleInner: false,
+    animation: false,
+    animationDuration: 50,
+    animationRule: "quad"
+}).draw();
+
 const canvas = document.getElementById('odometry');
 const ctx = canvas.getContext('2d');
 
@@ -73,7 +122,7 @@ function setupWebSocket() {
     socket.onopen = () => {
         console.log("Connected to WebSocket server.");
         // requestAnimationFrame(updateUI);
-        setTimeout(updateUI, 100);
+        // setTimeout(updateUI, 100);
     };
 
     // Incoming WebSocket messages
@@ -88,10 +137,8 @@ function setupWebSocket() {
 
         if (data.buggyspeed !== undefined) {
 
-            // badspeed = data.buggyspeed;
-            // buggyspeed = alpha * buggyspeed + (1 - alpha) * badspeed;
             buggyspeed = data.buggyspeed;
-            gaugeElement.setAttribute('data-value', buggyspeed);
+            gauge.value = buggyspeed;
             console.log(data.buggyspeed);
         }
 
@@ -143,12 +190,24 @@ function setupWebSocket() {
             document.querySelectorAll('.variables p')[2].textContent = `Peak ESP Loop Time: ${data.peak}`;
         }
 
+        if (data.reset) {
+            trackPoints = [];
+            minX = Infinity;
+            maxX = -Infinity;
+            minY = Infinity;
+            maxY = -Infinity;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            console.log("Path reset.");
+        }
+
         if (data.position && data.position.x !== undefined && data.position.y !== undefined) {
             x = data.position.x;
             y = data.position.y;
             addPoint(x, -y);
             console.log("Position:", x, y);
         }
+
+        updateUI();
     };
 
     // Handle WebSocket close
@@ -307,7 +366,7 @@ function drawPath() {
 }
 
 function updateUI() {
-    gaugeElement.setAttribute('data-value', buggyspeed);
+    gauge.value = buggyspeed;
     console.log("drawing");
     updateImage();
 }

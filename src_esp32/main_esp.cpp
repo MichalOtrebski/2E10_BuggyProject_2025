@@ -1,11 +1,11 @@
 /* #region LIBRARIES */
-#include "esp_cdc.h"         //* Library that Repackages Original ESP32-S3-MINI-1 Firmware Enabling Original CDC Bridge and CMSIS-DAP Behaviour
+#include "esp_cdc.h"            //* Library that Repackages Original ESP32-S3-MINI-1 Firmware Enabling Original CDC Bridge and CMSIS-DAP Behaviour
 
 #include <WiFi.h>               //* WiFi Library For Hosting AP
 #include <WebSocketsServer.h>   //* WebSockets Library for Hosting WebSockets for Asynchronous Communication
 #include <ArduinoJson.h>        //* JSON Library for Creating Json Formatted Variables, For Sending to the Client Over WebSockets
-#include <PacketSerial.h>
-#include <queue>
+#include <PacketSerial.h>       //* Library for Communication Between ESP32 and Renesas
+#include <queue>                //* Queue Library for FIFO behaviour
 
 #include <functional>           //* Tools for Function Objecst, Lambdas and std::funciton Wrappers
 #include <unordered_map>        //* Hash Table-Based Container Library
@@ -58,11 +58,6 @@ struct __attribute__((packed)) DataPacket {
   }
 };
 
-struct __attribute__((packed)) Position {
-  float x;
-  float y;
-};
-
 /* #endregion*/
 
 /* #region VARIABLES*/
@@ -92,6 +87,8 @@ int prevPeakLoop = 0;
 float x = 0, y = 0;
 float pastX = 0, pastY = 0;
 
+bool reset = false;
+
 /* #endregion */
 
 /* #region FUNCTION PROTOTYPES*/
@@ -114,7 +111,7 @@ void SendUpdate(const char command[4], T value);
 void setup() {
   // Initialize CDC Bridge and CMSIS-DAP
   esp32_cdc();
-  Serial1.begin(115200);
+  Serial1.begin(230400);
   serialPacket.setStream(&Serial1);
   serialPacket.setPacketHandler(&onPacketReceived);
 
@@ -137,7 +134,6 @@ void loop() {
   CheckAndSend();
 
   ending = micros(); // Get the current time in milliseconds
-
 
   if ((ending - start) > 2000) {
     if (millis() - prevLoop > 50) {
@@ -174,10 +170,11 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     {"LOP", [](const uint8_t* buf) { Data.loop = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     {"POS", [](const uint8_t* buf) { 
-      Position pair = reinterpret_cast<const DataPacket<Position>*>(buf)->value; 
-      x = pair.x;
-      y = pair.y;
+      std::pair<float, float> pair = reinterpret_cast<const DataPacket<std::pair<float, float>>*>(buf)->value; 
+      x = pair.first;
+      y = pair.second;
       SendUpdate("QRY", x); }}, // Extract the pair from the packet
+    {"RST", [](const uint8_t* buf) { reset = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
   };
 
@@ -247,9 +244,14 @@ void SendData() {
   doc["renesas"] = Data.loop;
   doc["esp"] = ESPLoop;
   doc["peak"] = PeakLoop;
+  doc["reset"] = reset;
   JsonObject position = doc.createNestedObject("position");
   position["x"] = x;
   position["y"] = y;
+
+  if (reset) {
+    reset = false;
+  }
 
   // JSON SERIALISATION, CONVERTING THE DOC TO A SINGLE STRING AND PUTTING IT INTO THE VARIABLE "output"
   String output;

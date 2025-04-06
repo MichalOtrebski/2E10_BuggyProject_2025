@@ -42,7 +42,7 @@ const int R_MOT = 6;  // PWM pins 6
 
 /* #region STRUCTS */
 
-//* Local Data Storage
+//* LOCAL DATA STORAGE
 struct LocalData{
   bool enable = false;
   int mode = 0;
@@ -55,7 +55,7 @@ struct LocalData{
   long loop = 0;
 };
 
-// ENCODER DATA STORAGE
+//* ENCODER DATA STORAGE
 struct EncoderData {
   volatile long pulse;
   volatile float distance;
@@ -63,16 +63,11 @@ struct EncoderData {
   volatile unsigned long last;
 };
 
-// BUGGY STATE BASED ON DETECTED TAG AND RESPONSE TO THAT TAG
+//* BUGGY STATE BASED ON DETECTED TAG AND RESPONSE TO THAT TAG
 enum state {
   NORMAL,
   WAIT_LINE,
   TURNING
-};
-
-struct __attribute__((packed)) Position {
-  float x;
-  float y;
 };
 
 //* Packet for Sending Command and value Pairs
@@ -92,7 +87,7 @@ struct __attribute__((packed)) DataPacket {
 
 LocalData Data; //* Current Data
 LocalData PrevData; //* Previous Data to Compare
-state BuggyState = NORMAL;
+state BuggyState = NORMAL; //* original state of the buggy
 
 // Initialise default encoder structs for left and right wheel encoder
 EncoderData leftHall = {0, 0.0, 0.0, 0};
@@ -105,7 +100,6 @@ unsigned long lastOdometryTime = 0;
 PacketSerial serialPacket;  //* Packet Serial object
 
 std::queue<unsigned long> timeAverage;
-std::queue<double> speedAverage;
 
 int speedSampling = 4;
 int speedSum = 0;
@@ -118,7 +112,7 @@ int sum = 0;
 const double PPR = 4.0;
 
 const float CIRCUM = 6.5 * M_PI; // in cm
-const int timeout = 500000;
+const int timeout = 400000;
 
 // IR SENSOR OUTPUT
 bool L_IR_O; 
@@ -206,7 +200,11 @@ int ActualWidth = 5;
 
 bool hardStop = true;
 
-unsigned long decelPrev;
+unsigned long decelPrev = 0;
+unsigned long decelStart = 0;
+
+unsigned long slowdownTime = 0;
+const int target = 20;
 
 float x = 0, y = 0, theta = 0;
 float pastX = 0, pastY = 0;
@@ -257,22 +255,28 @@ void printDebug();
 /* #endregion */
 
 void setup() {
+
+  // Initialise UART
   Serial.begin(230400);
-  Serial2.begin(115200);
+  Serial2.begin(230400);
   serialPacket.setStream(&Serial2);
   serialPacket.setPacketHandler(&onPacketReceived);
 
+  // Initialise I2C
   Wire.begin();
   Wire.setClock(400000UL);
 
-  turningPID.SetMode(AUTOMATIC); // changes the mode for the PID from manual to automatic, meaning itll automatically compute the output based on the difference between input and setpoint
+  // PID setup
+  turningPID.SetMode(AUTOMATIC);
   ReferenceSpeedPID.SetMode(AUTOMATIC);
   ReferenceObjectPID.SetMode(AUTOMATIC);
 
+  // PID sampling time
   turningPID.SetSampleTime(50);
   ReferenceSpeedPID.SetSampleTime(50);
   ReferenceObjectPID.SetSampleTime(50);
 
+  // Start HuskyLens Camera
   while(!huskylens.begin(Wire)){
     Serial.println("Huskylens begin failed!");  
     delay(1000);
@@ -289,11 +293,8 @@ void loop() {
   serialPacket.update();
 
   checkTimeout();
-
   SpeedAndDistance();
-
   odometry();
-
   CheckAndSend();
 
   // ON/OFF
@@ -347,24 +348,32 @@ void loop() {
       if (once) {
         int apparentWidth = result.width;
         int distance = (ActualWidth * CameraConstant) / apparentWidth;
-        // Serial.println(distance);
         decel = deceleration(distance);
-        once = false;
+
+        slowdownTime = (unsigned long)((Data.BuggySpeed - target) / decel);
+
+        decelStart = millis();
         decelPrev = millis();
+
+        once = false;
       }
       // Serial.println(decel);
 
-      if (ReferenceSpeedSetpoint + decel > 15) {
-        ReferenceSpeedSetpoint -= decel * millis() - decelPrev;
-        decelPrev = millis();
-      }else {
-        ReferenceSpeedSetpoint = 15;
+      if (Data.BuggySpeed < target) {
+        ReferenceSpeedSetpoint = target;
         Data.TagID = 0;
+      } else {
+        if ((millis() - decelStart) > slowdownTime) {
+          ReferenceSpeedSetpoint -= decel * (millis() - decelPrev);
+          decelPrev = millis();
+        }else {
+          ReferenceSpeedSetpoint = target;
+          Data.TagID = 0;
+        }
       }
-    } else if (Data.TagID == 4) {
 
-      Data.speed = 30;
-      SendUpdate("SPD", Data.speed);
+    } else if (Data.TagID == 4) {
+      ReferenceSpeedSetpoint = 35;
       Data.TagID = 0;
     }
 
@@ -390,6 +399,13 @@ void loop() {
       Data.speed = (int)ReferenceObjectOutput;
     } 
 
+    // IF MODE IS OUT OF RANGE
+    else {
+      stop();
+      Data.distance = 0;
+      Data.obstacle = false;
+    }
+
     switch (BuggyState) {
       case NORMAL:
         move();
@@ -405,24 +421,12 @@ void loop() {
     }
   } 
 
-  // IF MODE IS OUT OF RANGE
-  else {
-    stop();
-    Data.distance = 0;
-    Data.obstacle = false;
-  }
-
-  if (now - prev >= 100) {
-    //printDebug();
-    prev = now;
-  }
-
-  Serial.println(Data.BuggySpeed);
-
   ending = micros();
 
   timeAverage.push(ending - starting);
   sum += ending - starting;
+
+  // Serial.println(ending - starting);
 
   if (timeAverage.size() > quantity) {
     sum -= timeAverage.front();
@@ -435,7 +439,7 @@ void loop() {
   }
 }
 
-//* EVENT HANDLER FOR PACKETSERIAL
+//* EVENT HANDLER FOR SENDING PACKETS TO ESP32
 void onPacketReceived(const uint8_t* buffer, size_t size) {
 
   char command[4] = {};
@@ -446,13 +450,9 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
 
     {"ENA", [](const uint8_t* buf) { Data.enable = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     {"MOD", [](const uint8_t* buf) { Data.mode = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
-    // {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
-    // {"DIS", [](const uint8_t* buf) { Data.distance = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { ReferenceSpeedSetpoint = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     {"QRY", [](const uint8_t* buf) { Serial.println(reinterpret_cast<const DataPacket<float>*>(buf)->value); }}
   };
-
-
 
   auto it = commandMap.find(command);
   it->second(buffer);
@@ -608,8 +608,8 @@ void stop() {
     digitalWrite(RIGHT2, LOW);
     analogWrite(R_MOT, 60);
 
-  delay(5);
-  hardStop = false;
+    delay(5);
+    hardStop = false;
   }
 
   digitalWrite(LEFT1, LOW);
@@ -620,7 +620,7 @@ void stop() {
   digitalWrite(RIGHT2, HIGH);
   analogWrite(R_MOT, 0);
 
-  Data.BuggySpeed = 0;
+  // Data.BuggySpeed = 0;
 
   ReferenceSpeedPID.SetMode(MANUAL);
   ReferenceSpeedOutput = 0.10;
@@ -686,6 +686,9 @@ void boot() {
   SendUpdate("BSP", Data.BuggySpeed);
   SendUpdate("TAG", Data.TagID);
   SendUpdate("TRV", Data.travelled);
+  std::pair<float, float> pos = { x, y };
+  SendUpdate("POS", pos);
+  SendUpdate("RST", true);
 }
 
 //* Initialises All Pins to the Correct State
@@ -745,7 +748,7 @@ void RightHallISR() {
 void SpeedAndDistance() {
 
   // check for numerator 0, dividing 0 by anything is technically compiler specific, but just in case =
-  if ((millis() - prevSpeed) > 200) {
+  if ((millis() - prevSpeed) > 50) {
 
     if (!(leftHall.speed == 0.0 && rightHall.speed == 0.0)) {
       Data.BuggySpeed = (leftHall.speed + rightHall.speed) / 2.0; // average speed between the two wheels
@@ -760,7 +763,6 @@ void SpeedAndDistance() {
 }
 
 void checkTimeout() {
-
   unsigned long current = micros();
 
   if (current - leftHall.last > timeout) {
@@ -777,7 +779,6 @@ int area(int x, int y) {
 }
 
 void ReadCamera() {
-
   if (!huskylens.request())  {
     Serial.println("Request Failed.");
   } else if (!huskylens.isLearned()) {
@@ -870,13 +871,11 @@ void odometry() {
     theta += dTheta;
 
     if (x != pastX || y != pastY) {
-      Position pos = { x, y };
+      std::pair<float, float> pos = { x, y };
       SendUpdate("POS", pos);
       pastX = x;
       pastY = y;
     }
-
-    // Serial.println(String(x) + ", " + String(y));
 
     lastOdometryTime = millis();
   }
@@ -927,4 +926,3 @@ void printDebug() {
 
   Serial.println("------------------");
 }
-
