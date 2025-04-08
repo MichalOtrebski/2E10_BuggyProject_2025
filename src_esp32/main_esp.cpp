@@ -1,11 +1,11 @@
 /* #region LIBRARIES */
-#include "esp_cdc.h"         //* Library that Repackages Original ESP32-S3-MINI-1 Firmware Enabling Original CDC Bridge and CMSIS-DAP Behaviour
+#include "esp_cdc.h"            //* Library that Repackages Original ESP32-S3-MINI-1 Firmware Enabling Original CDC Bridge and CMSIS-DAP Behaviour
 
 #include <WiFi.h>               //* WiFi Library For Hosting AP
 #include <WebSocketsServer.h>   //* WebSockets Library for Hosting WebSockets for Asynchronous Communication
 #include <ArduinoJson.h>        //* JSON Library for Creating Json Formatted Variables, For Sending to the Client Over WebSockets
-#include <PacketSerial.h>
-#include <queue>
+#include <PacketSerial.h>       //* Library for Communication Between ESP32 and Renesas
+#include <queue>                //* Queue Library for FIFO behaviour
 
 #include <functional>           //* Tools for Function Objecst, Lambdas and std::funciton Wrappers
 #include <unordered_map>        //* Hash Table-Based Container Library
@@ -49,7 +49,7 @@ struct LocalData{
 
 //* Packet for Sending Command and value Pairs
 template<typename T>
-struct DataPacket {
+struct __attribute__((packed)) DataPacket {
   char command[4];
   T value;
 
@@ -80,8 +80,14 @@ unsigned long loopPrev = 0;
 
 int ESPLoop = 0;
 int prevESPLoop = 0;
+unsigned long prevLoop = 0;
 int PeakLoop = 0;
 int prevPeakLoop = 0;
+
+float x = 0, y = 0;
+float pastX = 0, pastY = 0;
+
+bool reset = false;
 
 /* #endregion */
 
@@ -105,7 +111,7 @@ void SendUpdate(const char command[4], T value);
 void setup() {
   // Initialize CDC Bridge and CMSIS-DAP
   esp32_cdc();
-  Serial1.begin(115200);
+  Serial1.begin(230400);
   serialPacket.setStream(&Serial1);
   serialPacket.setPacketHandler(&onPacketReceived);
 
@@ -129,19 +135,17 @@ void loop() {
 
   ending = micros(); // Get the current time in milliseconds
 
-  timeAverage.push(ending - start);
-  sum += ending - start;
-
-  if (timeAverage.size() > quantity) {
-    sum -= timeAverage.front();
-    timeAverage.pop();
-    ESPLoop = (ending - start);
-  }
-
-  if (ESPLoop > PeakLoop) {
-    PeakLoop = ESPLoop;
+  if ((ending - start) > 2000) {
+    if (millis() - prevLoop > 50) {
+      ESPLoop = (ending - start);
+      prevLoop = millis();
     }
-
+  }
+ 
+  if ((ending - start) > PeakLoop) {
+    PeakLoop = (ending - start);
+  }
+  
   static unsigned long lastExecutionTime = 0;
   if (millis() - lastExecutionTime >= 1000) {
     lastExecutionTime = millis();
@@ -156,7 +160,6 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
   memcpy(command, buffer, 4);
 
   static const std::unordered_map<std::string, std::function<void(const uint8_t*)>> commandMap = {
-
     {"ENA", [](const uint8_t* buf) { Data.enable = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     {"MOD", [](const uint8_t* buf) { Data.mode = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
     {"OBS", [](const uint8_t* buf) { Data.obstacle = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
@@ -240,6 +243,14 @@ void SendData() {
   doc["renesas"] = Data.loop;
   doc["esp"] = ESPLoop;
   doc["peak"] = PeakLoop;
+  doc["reset"] = reset;
+  JsonObject position = doc.createNestedObject("position");
+  position["x"] = x;
+  position["y"] = y;
+
+  if (reset) {
+    reset = false;
+  }
 
   // JSON SERIALISATION, CONVERTING THE DOC TO A SINGLE STRING AND PUTTING IT INTO THE VARIABLE "output"
   String output;
@@ -313,11 +324,6 @@ void CheckAndSend() {
     changed = true;
   }
 
-  // if (Data.distance != PrevData.distance) {
-  //   SendUpdate("DIS", Data.distance);
-  //   changed = true;
-  // }
-
   if (ESPLoop != prevESPLoop) {
     prevESPLoop = ESPLoop;
     changed = true;
@@ -325,6 +331,12 @@ void CheckAndSend() {
 
   if (PeakLoop != prevPeakLoop) {
     prevPeakLoop = PeakLoop;
+    changed = true;
+  }
+
+  if (x != pastX || y != pastY) {
+    pastX = x;
+    pastY = y;
     changed = true;
   }
 

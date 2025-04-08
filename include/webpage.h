@@ -24,35 +24,7 @@ const char* html = R"rawliteral(
           <img src="" class="images">
         </div>
         <div class="speedometer-section">
-            <canvas data-type="radial-gauge"
-                data-width="300"
-                data-height="300"
-                data-units="cm/s"
-                data-title="Speed"
-                data-value="0"
-                data-min-value="0"
-                data-max-value="50"
-                data-major-ticks="0,10,20,30,40,50"
-                data-minor-ticks="4"
-                data-stroke-ticks="true"
-                data-highlights='[
-                    { "from": 0, "to": 35, "color": "rgba(0,70,20,140)" },
-                    { "from": 35, "to": 50, "color": "rgba(150,0,0,140)" }
-                ]'
-                data-color-plate="#222"
-                data-color-major-ticks="#f5f5f5"
-                data-color-minor-ticks="#ddd"
-                data-color-title="#fff"
-                data-color-units="#ccc"
-                data-color-numbers="#eee"
-                data-color-needle-start="rgba(240, 128, 128, 1)"
-                data-color-needle-end="rgba(255, 160, 122, .9)"
-                data-value-box="true"
-                data-animation-rule="quint"
-                data-animation-duration="200"
-                data-font-value="Led"
-                data-animated-value="true"
-            ></canvas>
+            <canvas id="meter"></canvas>
             <div class="slidecontainer">
                 <input type="range" step="0.1" max="50" value="50" class="slider" id="speedslider">
                 <div style="margin-top: 5px; align-self: center;" id="speedSet">Speed: 0 cm/s</div>
@@ -87,7 +59,7 @@ const char* html = R"rawliteral(
         <img src="" class="images">
       </div>
       <div class="bottom-right">
-        <p>...</p>
+        <canvas class="canvas-container" id="odometry" width="750" height="400" style="border:2px solid #444;"></canvas>
       </div>
     </div>
   </div>
@@ -337,10 +309,9 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .bottom-right {
-    /* flex: 1; */
+    flex: 1;
     display: flex;
-    justify-content: center;
-    align-items: center;
+
 }
 
 .top-right {
@@ -374,6 +345,16 @@ input[type="range"]::-webkit-slider-thumb {
     src: "";
 }
 
+.canvas-container {
+    padding: 0;
+    margin: auto;
+    display: block;
+    width: 750px;
+    height: 400px;;
+    /* justify-content: center;
+    align-items: center; */
+}
+
 )rawliteral";
 
 const char* js = R"rawliteral(
@@ -393,7 +374,16 @@ let id = 0;
 let obstacleDetected = false;
 let badspeed = 0;
 
-alpha = 0.5;
+let minX = Infinity;
+let maxX = -Infinity
+let minY = Infinity;
+let maxY = -Infinity;
+
+let x = 0;
+let y = 0;
+
+const alpha = 0.5;
+const padding = 20;
 
 let isChangingSpeedSlider = false;
 
@@ -410,6 +400,8 @@ const slider = document.getElementById("speedslider");
 const output = document.getElementById("speedSet");
 
 const imageElements = document.querySelectorAll('.images');
+
+let trackPoints = [];
 
 /* #region Images */
 
@@ -430,7 +422,58 @@ const images = [
 
 //////////////////////////////////
 
-var gaugeElement = document.getElementsByTagName('canvas')[0];
+var gauge = new RadialGauge({
+    renderTo: 'meter',
+    width: 300,
+    height: 300,
+    title: "Speed",
+    units: "cm/s",
+    minValue: 0,
+    maxValue: 50,
+    majorTicks: [
+        "0",
+        "10",
+        "20",
+        "30",
+        "40",
+        "50"
+    ],
+    minorTicks: 4,
+    strokeTicks: true,
+    highlights: [
+        {
+            "from": 0,
+            "to": 35,
+            "color": "rgba(0, 70, 20, 140)"
+        },
+        {
+            "from": 35,
+            "to": 50,
+            "color": "rgba(150, 0, 0, 140)"
+        }
+    ],
+    colorPlate: "#222",
+    colorMajorTicks: "#f5f5f5",
+    colorMinorTicks: "#ddd",
+    colorTitle: "#fff",
+    colorUnits: "#ccc",
+    colorNumbers: "#eee",
+    colorNeedleStart: "rgba(240, 128, 128, 1)",
+    colorNeedleEnd: "rgba(240, 128, 128, 1)",
+    borderShadowWidth: 0,
+    borders: false,
+    needleType: "arrow",
+    needleWidth: 2,
+    needleCircleSize: 7,
+    needleCircleOuter: true,
+    needleCircleInner: false,
+    animation: false,
+    animationDuration: 50,
+    animationRule: "quad"
+}).draw();
+
+const canvas = document.getElementById('odometry');
+const ctx = canvas.getContext('2d');
 
 // Set up WebSocket connection
 function setupWebSocket() {
@@ -439,6 +482,8 @@ function setupWebSocket() {
     // console logging
     socket.onopen = () => {
         console.log("Connected to WebSocket server.");
+        // requestAnimationFrame(updateUI);
+        // setTimeout(updateUI, 100);
     };
 
     // Incoming WebSocket messages
@@ -453,10 +498,9 @@ function setupWebSocket() {
 
         if (data.buggyspeed !== undefined) {
 
-            // badspeed = data.buggyspeed;
-            // buggyspeed = alpha * buggyspeed + (1 - alpha) * badspeed;
             buggyspeed = data.buggyspeed;
-            // console.log(data.buggyspeed);
+            gauge.value = buggyspeed;
+            console.log(data.buggyspeed);
         }
 
         if (data.distance !== undefined) {
@@ -470,7 +514,7 @@ function setupWebSocket() {
 
         if (data.TagID !== undefined) {
             id = data.TagID;
-            console.log("Tag ID:", id);
+            // console.log("Tag ID:", id);
             document.querySelectorAll('.variables p')[3].textContent = `Tag ID: ${id}`;
         }
 
@@ -493,22 +537,38 @@ function setupWebSocket() {
         }
 
         if (data.renesas !== undefined) {
-            console.log("Renesas Loop Time:", data.renesas);
+            // console.log("Renesas Loop Time:", data.renesas);
             document.querySelectorAll('.variables p')[0].textContent = `Renesas Loop Time: ${data.renesas}`;
         }
 
         if (data.esp !== undefined) {
-            console.log("ESP32 Loop Time:", data.esp);
+            // console.log("ESP32 Loop Time:", data.esp);
             document.querySelectorAll('.variables p')[1].textContent = `ESP32 Loop Time: ${data.esp}`;
         }
 
         if (data.peak !== undefined) {
-            console.log("Peak:", data.peak);
+            // console.log("Peak:", data.peak);
             document.querySelectorAll('.variables p')[2].textContent = `Peak ESP Loop Time: ${data.peak}`;
         }
 
-        gaugeElement.setAttribute('data-value', buggyspeed);
-        updateImage();
+        if (data.reset) {
+            trackPoints = [];
+            minX = Infinity;
+            maxX = -Infinity;
+            minY = Infinity;
+            maxY = -Infinity;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            console.log("Path reset.");
+        }
+
+        if (data.position && data.position.x !== undefined && data.position.y !== undefined) {
+            x = data.position.x;
+            y = data.position.y;
+            addPoint(x, -y);
+            console.log("Position:", x, y);
+        }
+
+        updateUI();
     };
 
     // Handle WebSocket close
@@ -533,7 +593,6 @@ startStopBtn.addEventListener('click', () => {
     } else {
         socket.send("start");
     }
-
 });
 
 // listen to clicks on change mode
@@ -587,7 +646,7 @@ function updateModeText(mode) {
             modeText = "Reference Object";
             break;
         default:
-            modeText = "Unknown Mode";
+            modeText = "Unknown Mode"   ;
             break;
     }
     modeSelect.textContent = `${modeText}`;
@@ -618,9 +677,63 @@ function updateImage() {
     }
 }
 
+function addPoint(x, y) {
+    trackPoints.push({ x: x, y: y });
+
+    trackPoints.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      });
+
+    drawPath();
+}
+
+function drawPath() {
+    // Clear the canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Check if we have any points
+    if (trackPoints.length === 0) return;
+
+    const effectiveWidth = canvas.width - 2 * padding;
+    const effectiveHeight = canvas.height - 2 * padding;
+
+    const scaleX = effectiveWidth / (maxX - minX);
+    const scaleY = effectiveHeight / (maxY - minY);
+    
+    const scale = Math.min(scaleX, scaleY);
+    
+    const translateX = padding - (minX * scale);
+    const translateY = padding - (minY * scale);
+
+    ctx.save();
+
+    ctx.translate(translateX, translateY);
+    ctx.scale(scale, scale);
+    
+    // Draw the path
+    ctx.beginPath();
+    ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
+    trackPoints.forEach(point => {
+      ctx.lineTo(point.x, point.y);
+    });
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 3 / scale;
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function updateUI() {
+    gauge.value = buggyspeed;
+    console.log("drawing");
+    updateImage();
+}
+
 // updateModeText(mode); // might be redundant but havent tested
 setupWebSocket();
-
 
 )rawliteral";
 
