@@ -166,6 +166,11 @@ void onPacketReceived(const uint8_t* buffer, size_t size) {
     {"TRV", [](const uint8_t* buf) { Data.travelled = reinterpret_cast<const DataPacket<float>*>(buf)->value; }},
     {"LOP", [](const uint8_t* buf) { Data.loop = reinterpret_cast<const DataPacket<long>*>(buf)->value; }},
     {"SPD", [](const uint8_t* buf) { Data.speed = reinterpret_cast<const DataPacket<int>*>(buf)->value; }},
+    {"POS", [](const uint8_t* buf) { 
+      std::pair<float, float> pair = reinterpret_cast<const DataPacket<std::pair<float, float>>*>(buf)->value; 
+      x = pair.first;
+      y = pair.second; }}, // Extract the pair from the packet
+    {"RST", [](const uint8_t* buf) { reset = reinterpret_cast<const DataPacket<bool>*>(buf)->value; }},
     {"QRY", [](const uint8_t* buf) { Serial.println("QRY RECEIVED"); }}
   };
 

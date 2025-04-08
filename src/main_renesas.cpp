@@ -189,7 +189,7 @@ int TagDistance = 0;
 int CameraConstant = (50 * 32) / 5;
 double decel = 0;
 int ActualWidth = 5;
-
+ 
 bool hardStop = true;
 
 unsigned long decelPrev;
@@ -378,7 +378,11 @@ void loop() {
         junction();
         break;
     }
-  } 
+  } else {
+    stop();
+    Data.distance = 0;
+    Data.obstacle = false;
+  }
 
   // IF MODE IS OUT OF RANGE
   else {
@@ -625,7 +629,7 @@ void CheckAndSend() {
 
   if (Data.TagID != PrevData.TagID) {
     SendUpdate("TAG", Data.TagID);
-    Serial.println(Data.TagID);
+    // Serial.println(Data.TagID);
     changed = true;
   }
 
