@@ -151,7 +151,7 @@ double ReferenceSpeedSetpoint = 0.0;
 double ReferenceSpeedOutput;
 
 double ReferenceSpeedKp = 0.45;
-double ReferenceSpeedKi = 0.45;
+double ReferenceSpeedKi = 0.35;
 double ReferenceSpeedKd = 0; 
 
 // REFERENCEOBJECT PID VARIABLES
@@ -202,11 +202,14 @@ bool hardStop = true;
 unsigned long decelPrev = 0;
 unsigned long decelStart = 0;
 
-unsigned long slowdownTime = 0;
-const int target = 20;
+float slowdownTime = 0;
+const int target = 17;
+const int maxSpeed = 25;
+
 
 float x = 0, y = 0, theta = 0;
 float pastX = 0, pastY = 0;
+
 
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
 PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
@@ -348,31 +351,33 @@ void loop() {
         int distance = (ActualWidth * CameraConstant) / apparentWidth;
         decel = deceleration(distance);
 
-        slowdownTime = (unsigned long)((Data.BuggySpeed - target) / decel);
+        slowdownTime = ((Data.BuggySpeed - target) / abs(decel));
 
         decelStart = millis();
         decelPrev = millis();
 
         once = false;
+        SendUpdate("TAG", Data.TagID);
       }
-      // Serial.println(decel);
 
-      if (Data.BuggySpeed < target) {
+      // Serial.println(slowdownTime);
+
+      if ((millis() - decelStart) < (slowdownTime * 1000.0)) {
+        ReferenceSpeedSetpoint += (decel * ((millis() - decelPrev) / 1000.0));
+        decelPrev = millis();
+        Serial.print(ReferenceSpeedSetpoint);
+        // SendUpdate("SPD", ReferenceSpeedSetpoint);
+      }else {
         ReferenceSpeedSetpoint = target;
+        SendUpdate("SPD", target);
         Data.TagID = 0;
-      } else {
-        if ((millis() - decelStart) > slowdownTime) {
-          ReferenceSpeedSetpoint -= decel * (millis() - decelPrev);
-          decelPrev = millis();
-        }else {
-          ReferenceSpeedSetpoint = target;
-          Data.TagID = 0;
-        }
+        SendUpdate("TAG", Data.TagID);
       }
 
     } else if (Data.TagID == 4) {
-      ReferenceSpeedSetpoint = 35;
-
+      ReferenceSpeedSetpoint = maxSpeed;
+      SendUpdate("SPD", maxSpeed);
+      SendUpdate("TAG", Data.TagID);
       Data.TagID = 0;
     }
 
@@ -500,7 +505,7 @@ void forward(int speed) {
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, HIGH);
-  analogWrite(R_MOT, speed);
+  analogWrite(R_MOT, speed - 1);
 }
 
 void left() {
@@ -539,9 +544,9 @@ void sharpLeft() {
 
   digitalWrite(LEFT1, HIGH);
   digitalWrite(LEFT2, LOW);
-  analogWrite(L_MOT, 20);
+  analogWrite(L_MOT, 30);
 
-  delayMicroseconds(10);
+  delay(2);
 
   digitalWrite(LEFT1, LOW);
   digitalWrite(LEFT2, LOW);
@@ -557,9 +562,9 @@ void sharpRight() {
 
   digitalWrite(RIGHT1, HIGH);
   digitalWrite(RIGHT2, LOW);
-  analogWrite(R_MOT, 20);
+  analogWrite(R_MOT, 30);
 
-  delayMicroseconds(10);
+  delay(2);
 
   digitalWrite(RIGHT1, LOW);
   digitalWrite(RIGHT2, LOW);
@@ -865,7 +870,7 @@ void odometry() {
     rightLast = currentright;
 
     float d = (dL + dR) / 2.0;
-    float dTheta = (dR - dL) / 13;
+    float dTheta = ((dR - dL) / 12.84);
 
     x += d * cos(theta + dTheta / 2.0);
     y += d * sin(theta + dTheta / 2.0);
@@ -883,7 +888,7 @@ void odometry() {
 }
 
 double deceleration(double d) { 
-  double a = (((pow(Data.BuggySpeed, 2)) + pow(15, 2)) / 2*d);
+  double a = ((pow(target, 2) - pow(Data.BuggySpeed, 2)) / (2*d));
   return a;
 }
 
