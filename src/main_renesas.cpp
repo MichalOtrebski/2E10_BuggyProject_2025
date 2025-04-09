@@ -210,7 +210,6 @@ const int maxSpeed = 25;
 float x = 0, y = 0, theta = 0;
 float pastX = 0, pastY = 0;
 
-
 // CREATES A PID OBJECT USED FOR CALCULATING PID OUTPUT
 PID turningPID(&turningInput, &turningOutput, &turningSetpoint, turningKp, turningKi, turningKd, DIRECT);
 PID ReferenceSpeedPID(&ReferenceSpeedInput, &ReferenceSpeedOutput, &ReferenceSpeedSetpoint, ReferenceSpeedKp, ReferenceSpeedKi, ReferenceSpeedKd, DIRECT);
@@ -360,13 +359,10 @@ void loop() {
         SendUpdate("TAG", Data.TagID);
       }
 
-      // Serial.println(slowdownTime);
-
       if ((millis() - decelStart) < (slowdownTime * 1000.0)) {
         ReferenceSpeedSetpoint += (decel * ((millis() - decelPrev) / 1000.0));
         decelPrev = millis();
-        Serial.print(ReferenceSpeedSetpoint);
-        // SendUpdate("SPD", ReferenceSpeedSetpoint);
+        Serial.println(ReferenceSpeedSetpoint);
       }else {
         ReferenceSpeedSetpoint = target;
         SendUpdate("SPD", target);
